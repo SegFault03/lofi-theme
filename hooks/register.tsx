@@ -1,9 +1,13 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, PluginOptions, Register, Timer } from 'claude-code'
 
-import type { Fx, KittenPose, MascotPose, Phase, Room, Wall } from '../types'
+import type { Fx, KittenPose, MascotPose, Phase, Room, Screen, Wall } from '../types'
 import {
   classify,
+  dateLabel,
+  diffStat,
+  folderName,
+  prState,
   isRainyDay,
   KITTEN_POSES,
   kittenPose,
@@ -11,7 +15,9 @@ import {
   PHASES,
   phaseAt,
   restPose,
+  screenOf,
 } from './logic.js'
+import type { ScreenFacts } from './logic.js'
 import { buildScene, WALLS } from './scene.js'
 
 const PLUGIN = 'lofi-theme'
@@ -32,6 +38,11 @@ const room = atom({ plugin: 'lofi-theme', key: 'room' } as const, INITIAL, {
 // Bumped to have the scene drawn again with the time as it is now: the clock's
 // digits run on the scene's own CSS, which a sleeping machine leaves behind.
 const resync = atom({ plugin: 'lofi-theme', key: 'resync' } as const, 0)
+// What the wall TV shows. Change the tag when Screen's fields change.
+const BLANK: Screen = { project: '', feed: [] }
+const tv = atom({ plugin: 'lofi-theme', key: 'tv' } as const, BLANK, {
+  shape: 'tv-2',
+})
 
 // What the person chose in the plugin's options (plugin.json's `userConfig`).
 // A change there reloads this module, so they hold for the module's life.
@@ -42,6 +53,7 @@ type Options = {
   hasKitten: boolean
   hasCelebrations: boolean
   hasRain: boolean
+  hasTv: boolean
 }
 const DEFAULTS: Options = {
   clock: '24h',
@@ -50,6 +62,7 @@ const DEFAULTS: Options = {
   hasKitten: true,
   hasCelebrations: true,
   hasRain: true,
+  hasTv: true,
 }
 let O: Options = DEFAULTS
 
@@ -66,6 +79,7 @@ function readOptions(options: PluginOptions): Options {
     hasKitten: options.kitten !== false,
     hasCelebrations: options.celebrations !== false,
     hasRain: options.rain !== false,
+    hasTv: options.tv !== false,
   }
 }
 
@@ -102,7 +116,15 @@ const S = {
   pet: 'loaf' as KittenPose,
   ticks: 0,
   lastTickAt: 0,
+  day: '',
+  tick: undefined as Timer | undefined,
 }
+
+// What the session has told us for the TV. It starts over on a reload; the
+// screen itself lives in $.state, and `session.start` takes the chat's name
+// back from there.
+const F: ScreenFacts = {}
+let hasHeardTitle = false
 
 function hourNow(): number {
   const now = new Date()
@@ -161,9 +183,10 @@ async function dress($: EngineInterface): Promise<void> {
     backdrop: { scene: SCENE },
   })
 
-  if (!set.isDrawn) {
-    $.ui.status(`${PLUGIN}: ${set.reason}`)
-  }
+  // A theme that was set stands for the session: with no client attached yet
+  // (as at a reload) it is drawn when one attaches, so that is not worth a
+  // line under the prompt. Only a theme that does not stand is.
+  $.ui.status(set.isDrawn || set.requestId !== undefined ? undefined : `${PLUGIN}: ${set.reason}`)
 }
 
 async function sync($: EngineInterface): Promise<void> {
@@ -177,6 +200,107 @@ async function sync($: EngineInterface): Promise<void> {
   if (JSON.stringify(next) !== JSON.stringify(current)) {
     await update($, room, () => next)
   }
+}
+
+// Puts the session's figures on the TV. Each is asked for by itself: one the
+// engine cannot answer leaves the others on the screen.
+async function air($: EngineInterface): Promise<void> {
+  if (!O.hasTv) return
+  const current = await read($, tv)
+
+  // The names are not always there at the start (a reload starts the facts
+  // over, and may not raise `session.start`), so each airing asks again for
+  // one that is missing, and failing that keeps what the screen shows.
+  if (!F.project) {
+    const repo = await $.session.repo().catch(() => null)
+    const folder = repo?.root ?? (await $.session.cwd().catch(() => undefined))
+
+    F.project = folderName(folder) || current.project
+  }
+  if (!hasHeardTitle && !F.chat) F.chat = current.chat
+  // The login name, for the greeting that stands in for a missing name.
+  if (F.user === undefined) {
+    F.user =
+      (await $.env.get('USERNAME').catch(() => undefined)) ?? (await $.env.get('USER').catch(() => undefined)) ?? ''
+  }
+  F.turns = await $.session.turns().catch(() => F.turns)
+  const next = screenOf(F)
+
+  // As with the room: a write redraws the scene, so only a real change.
+  if (JSON.stringify(next) !== JSON.stringify(current)) {
+    await update($, tv, () => next)
+  }
+}
+
+// Reads the checked-out branch. Git says nothing outside a repository, or
+// with a detached head, and then the TV shows no branch.
+async function scout($: EngineInterface): Promise<void> {
+  if (!O.hasTv) return
+  const ran = await $.process.run(['git', 'branch', '--show-current'], { timeoutMs: 3000 }).catch(() => undefined)
+  const branch = ran?.exitCode === 0 ? ran.stdout.trim() || undefined : undefined
+
+  // Another branch has another pull request: the old one's mark goes at once.
+  if (branch !== F.branch) F.pr = undefined
+  F.branch = branch
+  if (branch === undefined) {
+    F.diff = undefined
+
+    return
+  }
+  // What is not committed yet, staged or not. A repository with no commit
+  // has no HEAD to compare with, and then there is no figure.
+  const stat = await $.process.run(['git', 'diff', '--shortstat', 'HEAD'], { timeoutMs: 3000 }).catch(() => undefined)
+
+  F.diff = stat?.exitCode === 0 ? diffStat(stat.stdout) : undefined
+}
+
+// Asks GitHub's own tool for the branch's pull request. It goes over the
+// network, so no hook waits for it: `survey` is started and left to air the
+// screen when it is back. Without `gh` it is not tried again.
+let hasGh = true
+
+async function survey($: EngineInterface): Promise<void> {
+  if (!O.hasTv || !hasGh || F.branch === undefined) return
+  const branch = F.branch
+  const ran = await $.process
+    .run(['gh', 'pr', 'view', '--json', 'state,isDraft,reviewDecision,statusCheckRollup'], { timeoutMs: 10_000 })
+    .catch(() => {
+      hasGh = false
+
+      return undefined
+    })
+
+  // The branch may have changed while GitHub answered.
+  if (branch !== F.branch) return
+  // No pull request, or not signed in: no mark.
+  F.pr = ran?.exitCode === 0 ? prState(ran.stdout) : undefined
+  await air($)
+}
+
+// Asks the engine for the figures as they are now, where no measurement
+// has brought them: at the start, and after /clear or a compaction.
+async function gauge($: EngineInterface): Promise<void> {
+  const usage = await $.session.usage().catch(() => undefined)
+
+  if (usage !== undefined) {
+    F.startedAt = usage.startedAt
+    F.context = usage.context
+    F.rateLimits = usage.rateLimits
+    F.cost = usage.cost
+  }
+}
+
+// The facts that hold for the whole session, and the first figures.
+async function tune($: EngineInterface, cwd: string): Promise<void> {
+  if (!O.hasTv) return
+  const repo = await $.session.repo().catch(() => null)
+
+  // Empty is left for `air` to ask about again.
+  F.project = folderName(repo?.root ?? cwd) || undefined
+  await gauge($)
+  await scout($)
+  await air($)
+  void survey($).catch(() => undefined)
 }
 
 // A moment that passes by itself: a cheer, a facepalm, the fireworks.
@@ -207,12 +331,23 @@ export const register: Register = (on, options) => {
     rollRest()
     rollPet()
     await sync($)
+    await tune($, e.cwd).catch(() => undefined)
 
     // Once a minute: follow the clock, and now and then let the two of them
     // find something else to do.
     S.lastTickAt = Date.now()
-    $.clock.every(TICK_MS, () => {
+    S.day = dateLabel()
+    // One tick, however often the session is said to start.
+    S.tick?.cancel()
+    S.tick = $.clock.every(TICK_MS, () => {
       const now = Date.now()
+      const day = dateLabel()
+
+      // The date under the clock is plain text: a new day draws it again.
+      if (day !== S.day) {
+        S.day = day
+        void update($, resync, count => count + 1).catch(() => undefined)
+      }
 
       // A tick that comes late means the machine slept, and the scene's own
       // clock with it: draw the scene again so the digits tell the time.
@@ -230,10 +365,67 @@ export const register: Register = (on, options) => {
         if ((idle === 'sleep') !== (S.rest === 'sleep')) S.rest = idle
       }
       void sync($)
+      // Nothing is polled: the figures come by `session.measure`, the branch
+      // with prompts and git commands. Only a project's name that is still
+      // missing is asked for again, until it is there.
+      if (O.hasTv && !F.project) void air($).catch(() => undefined)
     })
 
     return next(e)
   })
+
+  // The engine's own measurement, after each turn and when a quota window
+  // moves a whole point.
+  on('session.measure', async ($, e, next) => {
+    try {
+      F.context = e.context
+      F.rateLimits = e.rateLimits
+      F.cost = e.cost
+      await air($)
+    } catch {
+      // Display only.
+    }
+
+    return next(e)
+  })
+
+  // The chat's name is told only here and with each prompt, so a rename
+  // reaches the TV at the next prompt. This also runs on /clear and after a
+  // compaction, where `session.start` does not: the figures are read again.
+  on('classic.SessionStart', async ($, e, next) => {
+    try {
+      // No name with a /clear is a new chat; with anything else, the same one,
+      // whose name the screen still holds (after a reload, only the screen).
+      if (e.session_title !== undefined || e.source === 'clear') {
+        hasHeardTitle = true
+        F.chat = e.session_title
+      }
+      if (O.hasTv) await gauge($)
+      await air($)
+    } catch {
+      // Display only.
+    }
+
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  on('classic.UserPromptSubmit', async ($, e, next) => {
+    try {
+      if (e.session_title !== undefined && e.session_title !== F.chat) {
+        hasHeardTitle = true
+        F.chat = e.session_title
+      }
+      // The branch, and what is not committed, may have been changed outside
+      // the session since the last turn.
+      await scout($)
+      await air($)
+      void survey($).catch(() => undefined)
+    } catch {
+      // Display only.
+    }
+
+    return next(e)
+  }).catch(($, e, next) => next(e))
 
   on('prompt.change', async ($, e, next) => {
     try {
@@ -299,6 +491,10 @@ export const register: Register = (on, options) => {
         // Now it's the person's move: time to laze.
         rollRest()
         await sync($)
+        // The turn's edits are in: count them once, here, not at each edit.
+        await scout($)
+        await air($)
+        void survey($).catch(() => undefined)
       } catch {
         // Display only.
       }
@@ -351,6 +547,14 @@ export const register: Register = (on, options) => {
         S.hasBackgroundWork = true
       }
       const kind = isShell ? classify(input.command) : null
+
+      // A git or gh command may have changed the branch, what is committed
+      // or the pull request.
+      if (isShell && /(git|gh)/.test(String(input.command ?? ''))) {
+        await scout($)
+        await air($)
+        void survey($).catch(() => undefined)
+      }
 
       if (kind === 'merge' && !hasFailed) {
         await flash($, { mascot: 'cheer', fx: 'fireworks', kitten: 'startle' }, 25_000)
@@ -433,8 +637,13 @@ export const register: Register = (on, options) => {
     // Read only so that a bump draws the scene again.
     await read($, resync)
     const now = new Date()
-    const time = { h: now.getHours(), m: now.getMinutes(), s: now.getSeconds() }
-    const look = { clock: O.clock, wall: O.wall, hasKitten: O.hasKitten }
+    const time = { h: now.getHours(), m: now.getMinutes(), s: now.getSeconds(), day: dateLabel(now) }
+    const look = {
+      clock: O.clock,
+      wall: O.wall,
+      hasKitten: O.hasKitten,
+      tv: O.hasTv ? await read($, tv) : undefined,
+    }
     const alt = `A living room at ${state.phase}: the orange mascot is in its "${state.mascot}" pose${O.hasKitten ? ` and the kitten in its "${state.kitten}" pose` : ''}.`
 
     // The sandboxed frame is where the desktop app plays CSS animation.

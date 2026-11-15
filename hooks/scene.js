@@ -141,7 +141,7 @@ text{font-family:ui-monospace,Consolas,Menlo,monospace;font-weight:700}
 @keyframes clkh{0%{opacity:1}4.16667%,100%{opacity:0}}
 @keyframes clkt{0%{opacity:1}16.66667%,100%{opacity:0}}
 @keyframes clko{0%{opacity:1}10%,100%{opacity:0}}
-@keyframes walk{0%,100%{transform:translateX(0px)}50%{transform:translateX(280px)}}
+@keyframes walk{0%,100%{transform:translateX(0px)}50%{transform:translateX(165px)}}
 @keyframes face{0%{transform:scaleX(1)}50%,100%{transform:scaleX(-1)}}
 @keyframes step{50%{transform:translateY(-4px)}}
 @keyframes tilt{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(7deg)}}
@@ -151,6 +151,8 @@ text{font-family:ui-monospace,Consolas,Menlo,monospace;font-weight:700}
 @keyframes pulse{50%{opacity:.5}}
 @keyframes pop{0%{transform:scale(0)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
 @keyframes shake{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}}
+@keyframes cool{0%{opacity:0;transform:translateY(0)}30%{opacity:.8}100%{opacity:0;transform:translateY(34px)}}
+@keyframes tick{from{transform:translateX(232px)}to{transform:translateX(-600px)}}
 `
 
 // ---------------------------------------------------------------- outside
@@ -344,11 +346,12 @@ export function clockColumns(time, format = '24h') {
   ]
 }
 
-const CLOCK_AT = 'translate(1486,214)'
+// The clock stands on the shelf, between the cactus and the duck.
+const CLOCK_AT = 'translate(1474,433)'
 
-// The clock's case, on the wall under the room's light.
+// The clock's case, under the room's light.
 function clockCase() {
-  return `<g transform="${CLOCK_AT}"><rect x="-56" y="-28" width="112" height="56" rx="9" fill="#2b2f3a"/><rect x="-50" y="-22" width="100" height="44" rx="5" fill="#10131a"/><rect x="-38" y="28" width="14" height="5" rx="2" fill="#22252e"/><rect x="24" y="28" width="14" height="5" rx="2" fill="#22252e"/></g>`
+  return `<g transform="${CLOCK_AT}"><rect x="-56" y="-44" width="112" height="72" rx="9" fill="#2b2f3a"/><rect x="-50" y="-38" width="100" height="60" rx="5" fill="#10131a"/><rect x="-38" y="28" width="14" height="5" rx="2" fill="#22252e"/><rect x="24" y="28" width="14" height="5" rx="2" fill="#22252e"/></g>`
 }
 
 // Its digits, drawn over the wash so they glow at night as the screens do.
@@ -359,54 +362,95 @@ function clockFace(time, format) {
     .flat()
     .map(
       g =>
-        `<text x="${g.x}" y="9" font-size="26" text-anchor="middle"${g.isLit ? '' : ' opacity="0"'} style="animation:${g.name} ${g.period}s ${n(g.delay)}s steps(1) infinite">${g.label}</text>`,
+        `<text x="${g.x}" y="-7" font-size="26" text-anchor="middle"${g.isLit ? '' : ' opacity="0"'} style="animation:${g.name} ${g.period}s ${n(g.delay)}s steps(1) infinite">${g.label}</text>`,
     )
     .join('')
 
-  return `<g transform="${CLOCK_AT}" fill="#ffb86b">${glyphs}<text x="0" y="7" font-size="26" text-anchor="middle" style="animation:tw 2s steps(1) infinite">:</text></g>`
+  // The date is plain text: the hooks draw the scene again when the day turns.
+  const day = time.day ? `<g transform="${CLOCK_AT}"><text x="0" y="14" font-size="10.5" text-anchor="middle" fill="#c9905a">${esc(time.day)}</text></g>` : ''
+
+  return `${day}<g transform="${CLOCK_AT}" fill="#ffb86b">${glyphs}<text x="0" y="-9" font-size="26" text-anchor="middle" style="animation:tw 2s steps(1) infinite">:</text></g>`
 }
 
-function deskWall() {
-  const notes = [
-    [1304, 384, '#ffe27a', -5],
-    [1332, 392, '#ff9db0', 4],
-    [1362, 382, '#9fe0b0', -3],
-    [1390, 394, '#9fd0ff', 6],
-    [1318, 414, '#ffe27a', 3],
-  ]
-
-  return [
-    // A poster.
+// The poster hangs where the TV does, so it is drawn only when there is no TV.
+function poster() {
+  return `<g transform="translate(40,30)">${[
     rect(1320, 150, 96, 124, '#2b2f3a', 'rx="4"'),
     rect(1326, 156, 84, 112, '#1b1e26', 'rx="2"'),
     `<text x="1368" y="216" font-size="34" text-anchor="middle" fill="#d97757">{ }</text>`,
     `<text x="1368" y="246" font-size="9" text-anchor="middle" fill="#9aa3b5">hello, world</text>`,
-    // A shelf with books, a cactus and the rubber duck.
-    rect(1300, 350, 232, 8, '#b98a5e', 'rx="2"'),
-    rect(1316, 358, 6, 14, '#8f6843'),
-    rect(1510, 358, 6, 14, '#8f6843'),
+  ].join('')}</g>`
+}
+
+// A shelf with books, a cactus, room for the clock and the rubber duck, and
+// a row of notes stuck under it.
+function shelf() {
+  const notes = [
+    [1284, 368, '#ffe27a', -5],
+    [1318, 372, '#ff9db0', 4],
+    [1352, 366, '#9fe0b0', -3],
+    [1386, 372, '#9fd0ff', 6],
+    [1420, 367, '#ffe27a', 3],
+  ]
+
+  return `<g transform="translate(40,116)">${[
+    rect(1246, 350, 300, 8, '#b98a5e', 'rx="2"'),
+    rect(1262, 358, 6, 14, '#8f6843'),
+    rect(1524, 358, 6, 14, '#8f6843'),
+    `<g transform="translate(-56,0)">`,
     rect(1312, 300, 12, 50, '#6b7fd1', 'rx="1.5"'),
     rect(1325, 308, 10, 42, '#e9b44c', 'rx="1.5"'),
     rect(1336, 296, 14, 54, '#c9596b', 'rx="1.5"'),
     rect(1351, 312, 9, 38, '#7aa66a', 'rx="1.5"'),
-    `<g transform="rotate(14 1374 350)">${rect(1362, 304, 12, 46, '#e8dfd0', 'rx="1.5"')}</g>`,
+    `<g transform="rotate(14 1374 350)">${rect(1362, 304, 12, 46, '#e8dfd0', 'rx="1.5"')}</g></g>`,
+    `<g transform="translate(-78,0)">`,
     rect(1420, 330, 26, 20, '#c0694e', 'rx="3"'),
-    `<rect x="1427" y="298" width="12" height="34" rx="6" fill="#3f8f5a"/><rect x="1415" y="310" width="9" height="16" rx="4.5" fill="#3f8f5a"/><rect x="1440" y="306" width="9" height="18" rx="4.5" fill="#3f8f5a"/>`,
-    `<ellipse cx="1492" cy="340" rx="15" ry="10" fill="#ffd23f"/><circle cx="1502" cy="328" r="8" fill="#ffd23f"/><path d="M1509 327l8 3-8 3Z" fill="#f08a24"/><circle cx="1504" cy="326" r="1.4" fill="#2b1d16"/>`,
+    `<rect x="1427" y="298" width="12" height="34" rx="6" fill="#3f8f5a"/><rect x="1415" y="310" width="9" height="16" rx="4.5" fill="#3f8f5a"/><rect x="1440" y="306" width="9" height="18" rx="4.5" fill="#3f8f5a"/></g>`,
+    `<g transform="translate(20,0)"><ellipse cx="1492" cy="340" rx="15" ry="10" fill="#ffd23f"/><circle cx="1502" cy="328" r="8" fill="#ffd23f"/><path d="M1509 327l8 3-8 3Z" fill="#f08a24"/><circle cx="1504" cy="326" r="1.4" fill="#2b1d16"/></g>`,
     notes
       .map(
         ([x, y, color, turn]) =>
           `<g transform="rotate(${turn} ${x + 11} ${y + 11})">${rect(x, y, 22, 22, color)}<path d="M${x + 4} ${y + 8}h14M${x + 4} ${y + 13}h9" stroke="#2b1d16" stroke-width="1.4" opacity=".45"/></g>`,
       )
       .join(''),
+  ].join('')}</g>`
+}
+
+// An air conditioner on the wall over the window. Its case goes under the
+// wash; its light and the cool air go over it, and only while it runs.
+const AC = { x: 114, y: 228, w: 150, h: 46 }
+
+function airCase() {
+  return [
+    rect(AC.x, AC.y, AC.w, AC.h, '#e9edf2', 'rx="9"'),
+    rect(AC.x, AC.y + 30, AC.w, 16, '#d5dbe3', 'rx="7"'),
+    rect(AC.x + 12, AC.y + 36, AC.w - 24, 4, '#8791a6', 'rx="2"'),
+    rect(AC.x + 12, AC.y + 10, 34, 3, '#c3cad6', 'rx="1.5"'),
+    `<circle cx="${AC.x + AC.w - 14}" cy="${AC.y + 12}" r="2.6" fill="#8791a6"/>`,
   ].join('')
 }
+
+function airFlow() {
+  const wisps = [0, 1, 2, 3, 4]
+    .map(
+      i =>
+        `<path d="M${AC.x + 24 + i * 25} ${AC.y + AC.h + 6}q${i % 2 ? 5 : -5} 8 0 16" stroke="#d6f0ff" stroke-width="2.6" fill="none" stroke-linecap="round" opacity="0" style="animation:cool 2.8s ${n(-i * 0.56)}s infinite"/>`,
+    )
+    .join('')
+
+  return `<circle cx="${AC.x + AC.w - 14}" cy="${AC.y + 12}" r="2.6" fill="#7ae582" style="animation:pulse 2.4s infinite"/>${wisps}`
+}
+
+// How far the floor lamp's shade sits below where it was first drawn: a short
+// lamp leaves the wall over it to the window.
+const LAMP_CUT = 84
+const SHADE = `<path d="M258 ${382 + LAMP_CUT}h54l-10-46h-34Z"`
 
 function lamp(isOn) {
   return [
     `<ellipse cx="285" cy="668" rx="24" ry="6" fill="#3a322c"/>`,
-    rect(283, 380, 4, 288, '#3a322c'),
-    `<path d="M258 382h54l-10-46h-34Z" fill="${isOn ? '#ffe9b0' : '#e6d6b0'}"/>`,
+    rect(283, 380 + LAMP_CUT, 4, 288 - LAMP_CUT, '#3a322c'),
+    `${SHADE} fill="${isOn ? '#ffe9b0' : '#e6d6b0'}"/>`,
   ].join('')
 }
 
@@ -439,8 +483,11 @@ function couch() {
   ].join('')
 }
 
+// The kitten's bed, right of the plant and of where the two of them play.
+const BED_X = 300
+
 function catBed() {
-  return `<ellipse cx="300" cy="756" rx="50" ry="15" fill="#a94f63"/><ellipse cx="300" cy="752" rx="38" ry="9" fill="#d98294"/>`
+  return `<g transform="translate(${BED_X},${DROP})"><ellipse cx="0" cy="756" rx="50" ry="15" fill="#a94f63"/><ellipse cx="0" cy="752" rx="38" ry="9" fill="#d98294"/></g>`
 }
 
 function plant() {
@@ -453,13 +500,16 @@ function plant() {
     [28, -20, 62],
   ]
 
-  return `<g transform="translate(1490,780)"><g class="f" style="animation:leaf 8s infinite">${leaves
+  return `<g transform="translate(58,${774 + DROP})"><g class="f" style="animation:leaf 8s infinite">${leaves
     .map(
       ([x, y, turn], i) =>
         `<path d="M0 0L${x} ${y}" stroke="#2f6e45" stroke-width="3"/><ellipse cx="${x}" cy="${y}" rx="13" ry="24" fill="${i % 2 ? '#3f8f5a' : '#327a4a'}" transform="rotate(${turn} ${x} ${y})"/>`,
     )
     .join('')}</g><path d="M-24 0h48l-6 66h-36Z" fill="#c0694e"/><rect x="-27" y="-4" width="54" height="10" rx="3" fill="#d17d62"/></g>`
 }
+
+// Where the one screen is: its picture, inside the bezel.
+const PC = { x: 1357, y: 441, w: 108, h: 70 }
 
 function desk() {
   return [
@@ -470,18 +520,28 @@ function desk() {
     `<circle cx="1494" cy="646" r="13" fill="#15171c"/><circle cx="1494" cy="646" r="5" fill="#2d3039"/>`,
     rect(1180, 560, 372, 12, '#b98a5e', 'rx="3"'),
     rect(1180, 570, 372, 3, '#8f6843', 'opacity=".6"'),
-    // Two monitors: stands and bezels. Screens are drawn above the wash.
-    rect(1350, 516, 10, 38, '#3a3f4b'),
-    rect(1332, 552, 46, 8, '#3a3f4b', 'rx="3"'),
-    rect(1478, 516, 10, 38, '#3a3f4b'),
-    rect(1460, 552, 46, 8, '#3a3f4b', 'rx="3"'),
-    rect(1296, 436, 118, 80, '#1b1e26', 'rx="6"'),
-    rect(1424, 436, 118, 80, '#1b1e26', 'rx="6"'),
+    // The monitor: stand and bezel. Its screen is drawn above the wash.
+    rect(PC.x + 49, 516, 10, 38, '#3a3f4b'),
+    rect(PC.x + 31, 552, 46, 8, '#3a3f4b', 'rx="3"'),
+    rect(PC.x - 5, PC.y - 5, PC.w + 10, PC.h + 10, '#1b1e26', 'rx="6"'),
     // Keyboard and mug.
-    rect(1266, 552, 62, 8, '#2d3039', 'rx="2.5"'),
-    `<path d="M1270 555h54" stroke="#6ecbff" stroke-width="1.5" stroke-dasharray="4 2" opacity=".8"/>`,
-    rect(1392, 542, 16, 18, '#f4eee2', 'rx="3"'),
-    `<path d="M1408 546q8 1 0 9" stroke="#f4eee2" stroke-width="3" fill="none"/>`,
+    rect(1332, 552, 62, 8, '#2d3039', 'rx="2.5"'),
+    `<path d="M1336 555h54" stroke="#6ecbff" stroke-width="1.5" stroke-dasharray="4 2" opacity=".8"/>`,
+    rect(MUG_X, 542, 16, 18, '#f4eee2', 'rx="3"'),
+    `<path d="M${MUG_X + 16} 546q8 1 0 9" stroke="#f4eee2" stroke-width="3" fill="none"/>`,
+    // The desk lamp: its foot and arm. Its head is drawn above the wash.
+    rect(1212, 554, 30, 6, '#3a3f4b', 'rx="3"'),
+    `<path d="M1227 554l-8-44 22-22" stroke="#3a3f4b" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+  ].join('')
+}
+
+const MUG_X = 1442
+
+// The desk lamp's head, bent over the desk, and its light when it is on.
+function deskLamp(isOn, isDark) {
+  return [
+    isOn && isDark ? `<circle cx="1262" cy="520" r="150" fill="url(#lampGlow)"/>` : '',
+    `<g transform="translate(1241,488) rotate(-38)"><path d="M-16 4h32l-7-18h-18Z" fill="#d97757"/><ellipse cx="0" cy="4" rx="13" ry="3.5" fill="${isOn ? '#fff3c9' : '#8f6843'}"/></g>`,
   ].join('')
 }
 
@@ -496,62 +556,43 @@ function chair() {
 
 // What the two screens show. Drawn above the wash, since screens glow.
 function screens(mode) {
-  const a = { x: 1301, y: 441 }
-  const b = { x: 1429, y: 441 }
-  const w = 108
-  const h = 70
+  const { x, y, w, h } = PC
   const out = []
 
   if (mode === 'off') {
-    return rect(a.x, a.y, w, h, '#0c0e13', 'rx="3"') + rect(b.x, b.y, w, h, '#0c0e13', 'rx="3"')
+    return rect(x, y, w, h, '#0c0e13', 'rx="3"')
   }
   if (mode === 'work') {
     const r = rng(5)
     const colors = ['#d97757', '#6ecbff', '#7ae582', '#c9a0ff', '#e8dfd0', '#ffd166']
-    out.push(rect(a.x, a.y, w, h, '#1d2433', 'rx="3"'), rect(b.x, b.y, w, h, '#11161f', 'rx="3"'))
+    out.push(rect(x, y, w, h, '#1d2433', 'rx="3"'))
     for (let i = 0; i < 7; i++) {
       const indent = Math.floor(r() * 3) * 8
       const len = 22 + r() * 56
       out.push(
-        `<rect class="l" x="${a.x + 8 + indent}" y="${a.y + 8 + i * 8.5}" width="${n(Math.min(len, w - 18 - indent))}" height="4" rx="2" fill="${colors[i % colors.length]}" style="animation:type 5s ${n(i * 0.45)}s steps(9) infinite"/>`,
+        `<rect class="l" x="${x + 8 + indent}" y="${y + 8 + i * 8.5}" width="${n(Math.min(len, w - 18 - indent))}" height="4" rx="2" fill="${colors[i % colors.length]}" style="animation:type 5s ${n(i * 0.45)}s steps(9) infinite"/>`,
       )
     }
-    for (let i = 0; i < 6; i++) {
-      out.push(
-        `<rect class="l" x="${b.x + 8}" y="${b.y + 9 + i * 9}" width="${n(30 + r() * 60)}" height="3.5" rx="1.5" fill="#7ae582" opacity=".85" style="animation:type 3.2s ${n(i * 0.5)}s steps(6) infinite"/>`,
-      )
-    }
-    out.push(
-      `<rect x="${b.x + 8}" y="${b.y + 61}" width="6" height="4" fill="#7ae582" style="animation:tw .9s steps(1) infinite"/>`,
-    )
 
     return out.join('')
   }
   if (mode === 'fail') {
     return [
-      rect(a.x, a.y, w, h, '#3a1216', 'rx="3"'),
-      rect(b.x, b.y, w, h, '#3a1216', 'rx="3"'),
-      `<g stroke="#ff5d73" stroke-width="7" stroke-linecap="round" style="animation:pulse 1s infinite"><path d="M1337 458l36 36M1373 458l-36 36"/></g>`,
-      `<g fill="#ff5d73" opacity=".85">${[0, 1, 2, 3].map(i => rect(b.x + 8, b.y + 10 + i * 12, 50 + ((i * 23) % 40), 4, '#ff5d73', 'rx="2"')).join('')}</g>`,
+      rect(x, y, w, h, '#3a1216', 'rx="3"'),
+      `<g stroke="#ff5d73" stroke-width="7" stroke-linecap="round" style="animation:pulse 1s infinite"><path d="M${x + 36} ${y + 17}l36 36M${x + 72} ${y + 17}l-36 36"/></g>`,
     ].join('')
   }
   if (mode === 'pass') {
     return [
-      rect(a.x, a.y, w, h, '#10301f', 'rx="3"'),
-      rect(b.x, b.y, w, h, '#10301f', 'rx="3"'),
-      `<g stroke="#7ae582" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"><path class="c" style="animation:pop .5s" d="M1335 478l14 14 26-32"/><path class="c" style="animation:pop .5s .2s" d="M1463 478l14 14 26-32"/></g>`,
+      rect(x, y, w, h, '#10301f', 'rx="3"'),
+      `<g stroke="#7ae582" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"><path class="c" style="animation:pop .5s" d="M${x + 34} ${y + 37}l14 14 26-32"/></g>`,
     ].join('')
   }
 
-  // Idle: a screensaver on one, a dim desktop on the other.
+  // Idle: a screensaver.
   return [
-    rect(a.x, a.y, w, h, '#161b27', 'rx="3"'),
-    rect(b.x, b.y, w, h, '#1d2433', 'rx="3"'),
-    `<g><g style="animation:saver 14s linear infinite"><rect x="${a.x + 4}" y="${a.y + 4}" width="22" height="16" rx="3" fill="#d97757"/></g></g>`,
-    rect(b.x + 8, b.y + 8, 40, 26, '#2b3550', 'rx="2"'),
-    rect(b.x + 54, b.y + 8, 46, 12, '#2b3550', 'rx="2"'),
-    rect(b.x + 54, b.y + 24, 46, 10, '#2b3550', 'rx="2"'),
-    rect(b.x + 8, b.y + 40, 92, 22, '#2b3550', 'rx="2"'),
+    rect(x, y, w, h, '#161b27', 'rx="3"'),
+    `<g><g style="animation:saver 14s linear infinite"><rect x="${x + 4}" y="${y + 4}" width="22" height="16" rx="3" fill="#d97757"/></g></g>`,
   ].join('')
 }
 
@@ -662,7 +703,7 @@ function mascot(room) {
 
   switch (pose) {
     case 'phone':
-      return at(172, 622, 0, critter({ look: [5, 4], arms: 'phone' }))
+      return at(172, 622 + DROP, 0, critter({ look: [5, 4], arms: 'phone' }))
     case 'scroll': {
       const hearts = [0, 1, 2]
         .map(
@@ -673,7 +714,7 @@ function mascot(room) {
 
       return at(
         208,
-        620,
+        620 + DROP,
         -16,
         critter({ eyes: 'half', look: [6, 2], arms: 'phone' }),
         hearts,
@@ -683,7 +724,7 @@ function mascot(room) {
     case 'nap':
       return at(
         208,
-        622,
+        622 + DROP,
         -7,
         critter({ eyes: 'closed', look: [0, 2] }),
         zees(30, -66),
@@ -692,7 +733,7 @@ function mascot(room) {
     case 'sleep':
       return at(
         208,
-        622,
+        622 + DROP,
         -7,
         critter({ eyes: 'closed', look: [0, 2] }) +
           `<path d="M-26-60h44l18-24Z" fill="#6b7fd1"/><circle cx="36" cy="-85" r="6" fill="#fff"/>` +
@@ -704,31 +745,31 @@ function mascot(room) {
     case 'notice':
       return at(
         172,
-        622,
+        622 + DROP,
         0,
         critter({ eyes: 'wide', look: [6, -2] }),
         `<g transform="translate(0,-74)"><g class="f" style="animation:pop .4s"><rect x="-4" y="-26" width="8" height="18" rx="3" fill="#ffcc33"/><circle cx="0" cy="-2" r="4.5" fill="#ffcc33"/></g></g>`,
         'hop .8s ease-out 2',
       )
     case 'window':
-      return at(110, 308, 0, critter({ look: [7, -5] }), '', 'breathe 4.4s ease-in-out infinite')
+      return at(110, SILL, 0, critter({ look: [7, -5] }), '', 'breathe 4.4s ease-in-out infinite')
     case 'work':
-      return at(1278, 600, 0, critter({ look: [8, 2], arms: 'tapping' }), '', 'bob .52s infinite')
+      return at(1350, 600 + DESK_DROP, 0, critter({ look: [8, 2], arms: 'tapping' }), '', 'bob .52s infinite')
     case 'facepalm':
       return at(
-        1278,
-        600,
+        1350,
+        600 + DESK_DROP,
         0,
         critter({ eyes: 'none', arms: 'face' }),
         `<path class="c" d="M34-70q-7 11 0 14q7-3 0-14Z" fill="#6ecbff" style="animation:steam 1.8s infinite"/>`,
         'shake .5s 3',
       )
     case 'play':
-      return at(150, 748, 0, critter({ eyes: 'happy', look: [5, 0], arms: 'stick' }))
+      return at(168, 748 + DROP, 0, critter({ eyes: 'happy', look: [5, 0], arms: 'stick' }))
     case 'cheer':
       return at(
         200,
-        748,
+        748 + DROP,
         0,
         critter({ eyes: 'happy', arms: 'up' }) +
           `<path d="M-14-62l14-30 14 30Z" fill="#ffcc33"/><path d="M-9-72h18M-5-80h10" stroke="#e85d75" stroke-width="3"/><circle cx="0" cy="-93" r="4.5" fill="#e85d75"/>`,
@@ -736,7 +777,7 @@ function mascot(room) {
         'jump .62s ease-in-out infinite',
       )
     default:
-      return at(172, 622, 0, critter({}))
+      return at(172, 622 + DROP, 0, critter({}))
   }
 }
 
@@ -825,25 +866,25 @@ function kitten(room) {
 
   switch (pose) {
     case 'loaf':
-      return at(329, 592, catLoaf(false))
+      return at(329, 592 + DROP, catLoaf(false))
     case 'sleep':
-      return at(300, 756, catLoaf(true), { extra: zees(22, -24, '#fff', 3.6).replace(/font-size="(\d+)"/g, (_, s) => `font-size="${s - 6}"`) })
+      return at(BED_X, 756 + DROP, catLoaf(true), { extra: zees(22, -24, '#fff', 3.6).replace(/font-size="(\d+)"/g, (_, s) => `font-size="${s - 6}"`) })
     case 'sill':
-      return at(290, 308, catSitting({ isBack: true }))
+      return at(290, SILL, catSitting({ isBack: true }))
     case 'desk':
-      return at(1522, 560, catSitting({}))
+      return at(1532, 560 + DESK_DROP, catSitting({}))
     case 'startle':
-      return at(290, 308, catSitting({ eyes: 'wide', isSpiky: true }), { motion: 'hop .45s infinite' })
+      return at(290, SILL, catSitting({ eyes: 'wide', isSpiky: true }), { motion: 'hop .45s infinite' })
     case 'yarn':
-      return at(110, 815, catStanding({ isSwiping: true }), {
+      return at(168, 806 + DROP, catStanding({ isSwiping: true }), {
         extra: `<g transform="translate(34,-9)"><g class="c" style="animation:roll 1.4s ease-in-out infinite"><circle r="9" fill="#e85d75"/><path d="M-6-3q6 6 12 0M-5 4q5-5 10 0" stroke="#b83d55" stroke-width="1.4" fill="none"/></g></g><path d="M40 0q30 6 60-4" stroke="#e85d75" stroke-width="1.6" fill="none"/>`,
       })
     case 'pounce':
-      return at(214, 752, catStanding({ isSwiping: true }), { turn: -30, motion: 'hop .7s infinite' })
+      return at(228, 752 + DROP, catStanding({ isSwiping: true }), { turn: -30, motion: 'hop .7s infinite' })
     case 'prowl':
-      return `<g class="zl"><g transform="translate(40,782)"><g style="animation:walk 16s linear infinite"><g class="c" style="animation:face 16s steps(1) infinite">${catStanding({ isWalking: true })}</g></g></g></g>`
+      return `<g class="zl"><g transform="translate(156,${782 + DROP})"><g style="animation:walk 16s linear infinite"><g class="c" style="animation:face 16s steps(1) infinite">${catStanding({ isWalking: true })}</g></g></g></g>`
     default:
-      return at(329, 592, catLoaf(false))
+      return at(329, 592 + DROP, catLoaf(false))
   }
 }
 
@@ -869,6 +910,190 @@ function confetti() {
 // Moves every inline style="..." into a class in the <style> block. The app
 // draws the scene in a sandboxed frame that keeps the stylesheet; animations
 // named in style attributes did not run there.
+// ---------------------------------------------------------------- the TV
+// A wall TV over the desk that shows the session's figures: `look.tv`, a
+// Screen. Left out, there is no TV and the poster hangs there. Like the
+// clock, its case goes under the wash and its picture over it. It is drawn
+// 240 x 164 and set larger by `s`, which is what makes its text readable.
+
+const TV = { x: 1232, y: 106, w: 240, h: 164, s: 1.45 }
+const TV_AT = `translate(${TV.x},${TV.y}) scale(${TV.s})`
+const SCREEN_AT = `translate(${n(TV.x + 7 * TV.s)},${n(TV.y + 7 * TV.s)}) scale(${TV.s})`
+const SCREEN = { w: TV.w - 14, h: TV.h - 22 }
+
+// Names come from the session, so they are escaped and cut to fit.
+const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
+const fit = (s, max) => {
+  const chars = [...String(s ?? '')]
+
+  return esc(chars.length > max ? chars.slice(0, max - 1).join('') + '…' : chars.join(''))
+}
+const tokens = t => (t >= 1e6 ? n(t / 1e6) + 'M' : t >= 1000 ? Math.round(t / 1000) + 'k' : String(t))
+// Green, then yellow past half, then red past four fifths.
+const heat = p => (p > 80 ? '#ff5d6c' : p > 50 ? '#ffd23f' : '#7ae582')
+
+function tvCase() {
+  return `<g transform="${TV_AT}">${[
+    rect(0, 0, TV.w, TV.h, '#23262f', 'rx="8"'),
+    rect(7, 7, SCREEN.w, SCREEN.h, '#0c0f16', 'rx="3"'),
+    rect(TV.w / 2 - 14, TV.h - 10, 28, 3, '#3a3f4c', 'rx="1.5"'),
+  ].join('')}</g>`
+}
+
+// One ring of the quota dial: a dim track, and an arc as a dash of the same
+// circle. Static: nothing here animates, so nothing here can still the room.
+function ring(r, percent) {
+  const around = 2 * Math.PI * r
+  const p = Math.min(100, Math.max(0, percent ?? 0))
+  const arc =
+    percent == null || p <= 0
+      ? ''
+      : `<circle r="${r}" fill="none" stroke="${heat(p)}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${n((around * p) / 100)} ${n(around)}" transform="rotate(-90)"/>`
+
+  return `<circle r="${r}" fill="none" stroke="#9aa3b5" stroke-width="7" opacity=".18"/>${arc}`
+}
+
+// One of the two names on the TV. One that fits stands still. A longer one
+// pans to its end and back under a clip, by a keyframe written for its own
+// length (translate only, as the rest are): `css` goes in the style block.
+// The width is a guess at a monospace face, 0.62 of the size a character (0.61 measured).
+const WIDE = 0.62
+
+function nameLine(id, text, { x, y, size, room, fill }) {
+  const chars = [...String(text ?? '')].slice(0, 80)
+  const over = Math.ceil(chars.length * size * WIDE - room)
+  const label = esc(chars.join(''))
+
+  if (over <= 0) {
+    return { svg: `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}">${label}</text>`, css: '' }
+  }
+  const seconds = n(8 + over / 14)
+
+  return {
+    svg: `<clipPath id="${id}"><rect x="${x}" y="${n(y - size)}" width="${room}" height="${n(size * 1.4)}"/></clipPath><g clip-path="url(#${id})"><text x="${x}" y="${y}" font-size="${size}" fill="${fill}" style="animation:${id} ${seconds}s linear infinite">${label}</text></g>`,
+    css: `@keyframes ${id}{0%,20%{transform:translateX(0px)}50%,70%{transform:translateX(-${over + 4}px)}100%{transform:translateX(0px)}}`,
+  }
+}
+
+// The chat's name over the project's. A greeting stands in for one that is
+// not known yet.
+// The mark for a pull request, a disc 9 across with its top left at x, y:
+// the colour says how it stands and the sign inside says why.
+function prMark(state, x, y) {
+  const at = `<g transform="translate(${n(x + 4.5)},${n(y + 4.5)})">`
+  const disc = fill => `<circle r="4.5" fill="${fill}"/>`
+  const ring = (stroke, extra = '') => `<circle r="3.8" fill="none" stroke="${stroke}" stroke-width="1.4"${extra}/>`
+  const sign = d => `<path d="${d}" stroke="#0c0f16" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+  const marks = {
+    draft: ring('#9aa3b5', ' stroke-dasharray="2 1.6"'),
+    open: ring('#7ae582'),
+    pending: disc('#ffd23f') + `<circle r="1.5" fill="#0c0f16" style="animation:pulse 1.6s infinite"/>`,
+    failing: disc('#ff5d6c') + sign('M-1.8-1.8l3.6 3.6M1.8-1.8l-3.6 3.6'),
+    passing: disc('#7ae582') + sign('M-2.2 0l1.6 1.7 2.8-3.2'),
+    changes: disc('#ffb347') + sign('M0-2.4v2.6M0 2.3v.1'),
+    merged: disc('#b48cff') + sign('M-1.6-2.2v4.4M-1.6 0q3.4 0 3.4-2.2'),
+    closed: ring('#ff5d6c') + `<path d="M-2.6 2.6l5.2-5.2" stroke="#ff5d6c" stroke-width="1.4" stroke-linecap="round"/>`,
+  }
+
+  return marks[state] ? `${at}${marks[state]}</g>` : ''
+}
+
+const count = v => (v >= 1000 ? n(v / 1000) + 'k' : String(v))
+
+// The pull request's card, on a line of its own under the branch, its text
+// on the baseline y: a rounded label for how the request stands, as GitHub
+// draws one, and beside it the checks or the review where there is news.
+const PR_LABEL = { draft: ['Draft', '#6e7681'], merged: ['Merged', '#8957e5'], closed: ['Closed', '#da3633'] }
+const PR_NOTE = {
+  pending: ['checks running', '#ffd23f'],
+  failing: ['checks failing', '#ff5d6c'],
+  passing: ['checks passed', '#7ae582'],
+  changes: ['changes requested', '#ffb347'],
+}
+
+function prCard(state, y) {
+  if (!PR_STATES.includes(state)) return ''
+  const [label, fill] = PR_LABEL[state] ?? ['Open', '#238636']
+  const width = 16 + Math.ceil(label.length * 4.6)
+  const note = PR_NOTE[state]
+
+  return [
+    rect(82, n(y - 8.3), width, 11, fill, 'rx="5.5"'),
+    // The request's own sign: a branch that comes back to the trunk.
+    `<g fill="none" stroke="#fff" stroke-width="1"><circle cx="86.6" cy="${n(y - 5.6)}" r="1.2"/><circle cx="86.6" cy="${n(y - 0.2)}" r="1.2"/><path d="M86.6 ${n(y - 4.4)}v3"/><circle cx="90.6" cy="${n(y - 0.2)}" r="1.2"/><path d="M90.6 ${n(y - 1.4)}v-2.4q0-1.8-1.9-1.8"/></g>`,
+    `<text x="94" y="${n(y - 0.2)}" font-size="7.5" fill="#fff">${label}</text>`,
+    note ? prMark(state, 82 + width + 5, y - 7.4) + `<text x="${82 + width + 17}" y="${n(y - 0.2)}" font-size="7.5" fill="${note[1]}">${note[0]}</text>` : '',
+  ].join('')
+}
+
+const PR_STATES = ['draft', 'open', 'pending', 'failing', 'passing', 'changes', 'merged', 'closed']
+
+// Under the project's, the branch, where the folder is in a repository, with
+// what is not committed at the line's right end; under that, the pull
+// request's card. With no request its line stays empty.
+function tvNames(tv) {
+  const hasBranch = Boolean(tv.project && tv.branch)
+  const [a, b, c] = hasBranch ? [24, 36.5, 52] : [31, 47, 0]
+  const top = nameLine('pana', tv.chat ?? tv.greeting ?? 'new chat', { x: 82, y: a, size: 12, room: 140, fill: '#f4eee2' })
+  const sub = tv.project
+    ? nameLine('panb', tv.project, { x: 95, y: b, size: 8.5, room: 127, fill: '#9aa3b5' })
+    : nameLine('panb', tv.chat ? (tv.greeting ?? '') : '', { x: 82, y: b, size: 8.5, room: 140, fill: '#9aa3b5' })
+  const folder = tv.project ? `<path d="M82 ${b - 6.5}h3.6l1.4 1.5h5v6h-10Z" fill="#e9b44c"/>` : ''
+  // What is not committed stands right after the branch's name. A name too
+  // long for the room left of it pans, and the figure keeps the line's end.
+  let aside = hasBranch ? prCard(tv.pr, 66.5) : ''
+  let room = 222 - 95
+
+  if (hasBranch && tv.diff) {
+    const added = `+${count(tv.diff.added)}`
+    const removed = `-${count(tv.diff.removed)}`
+    const wide = WIDE * 9.5
+
+    room -= Math.ceil((added.length + removed.length + 1) * WIDE * 8.5) + 7
+    const x = 95 + Math.min(room, Math.ceil([...String(tv.branch)].length * wide)) + 7
+
+    aside += `<text x="${x}" y="${c}" font-size="8.5"><tspan fill="#7ae582">${added}</tspan><tspan fill="#5b6478">/</tspan><tspan fill="#ff5d6c">${removed}</tspan></text>`
+  }
+  const twig = hasBranch ? nameLine('panc', tv.branch, { x: 95, y: c, size: 9.5, room, fill: '#8fd3a8' }) : { svg: '', css: '' }
+  // The branch mark: a trunk between two dots, and a third dot joined to it.
+  const mark = hasBranch
+    ? `<g fill="none" stroke="#8fd3a8" stroke-width="1.2"><circle cx="84.6" cy="${c - 7.6}" r="1.6"/><circle cx="84.6" cy="${c - 0.4}" r="1.6"/><circle cx="90.6" cy="${c - 6}" r="1.6"/><path d="M84.6 ${c - 6}v4M90.6 ${c - 4.4}q0 2.8-4.4 3"/></g>`
+    : ''
+
+  return { svg: top.svg + folder + sub.svg + mark + twig.svg + aside, css: top.css + sub.css + twig.css }
+}
+
+// The picture, drawn over the wash so it glows at night as the screens do.
+function tvFace(tv) {
+  const pct = v => (v == null ? '--' : Math.round(v) + '%')
+  const quota = (y, label, limit) =>
+    `<text x="82" y="${y}" font-size="8.5" fill="${limit ? heat(limit.percent) : '#5b6478'}">${label} ${pct(limit?.percent)}${limit?.resets ? `<tspan fill="#5b6478"> · resets ${fit(limit.resets, 9)}</tspan>` : ''}</text>`
+  const ctx = tv.context
+  const used = ctx?.percent == null ? 0 : Math.min(100, Math.max(0, ctx.percent))
+  const feed = (tv.feed ?? []).map(item => fit(item, 28)).join('  ·  ')
+  // A line that fits stands still; a longer one slides by.
+  const isSliding = feed.length > 44
+
+  return [
+    `<g transform="${SCREEN_AT}"><clipPath id="tvClip"><rect width="${SCREEN.w}" height="${SCREEN.h}" rx="3"/></clipPath><g clip-path="url(#tvClip)">`,
+    // The dial: the week outside, five hours inside.
+    `<g transform="translate(40,66)">${ring(30, tv.week?.percent)}${ring(20, tv.fiveHour?.percent)}<text y="4" font-size="10" text-anchor="middle" fill="${tv.fiveHour ? heat(tv.fiveHour.percent) : '#5b6478'}">${tv.fiveHour ? Math.round(tv.fiveHour.percent) : '--'}</text></g>`,
+    tvNames(tv).svg,
+    quota(81, '5H', tv.fiveHour),
+    quota(93, 'WK', tv.week),
+    // The context window.
+    `<text x="82" y="108" font-size="8.5" fill="${ctx?.percent == null ? '#5b6478' : heat(used)}">CTX ${pct(ctx?.percent)}<tspan fill="#5b6478">${ctx?.tokens == null ? '' : ` · ${tokens(ctx.tokens)} / ${tokens(ctx.window)}`}</tspan></text>`,
+    rect(82, 112, 136, 5, '#9aa3b5', 'rx="2.5" opacity=".18"'),
+    used > 0 ? rect(82, 112, n((136 * used) / 100), 5, heat(used), 'rx="2.5"') : '',
+    // The ticker.
+    rect(0, SCREEN.h - 16, SCREEN.w, 16, '#161a24'),
+    isSliding
+      ? `<text y="${SCREEN.h - 5}" font-size="8" fill="#c9d1e3" style="animation:tick 30s -6s linear infinite">${feed}</text>`
+      : `<text x="8" y="${SCREEN.h - 5}" font-size="8" fill="#c9d1e3">${feed}</text>`,
+    '</g></g>',
+  ].join('')
+}
+
 function hoist(svg) {
   const rules = new Map()
   const out = svg.replace(
@@ -913,13 +1138,22 @@ function shaded(svg, k) {
 
 const OPEN = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">`
 
-// The window, drawn at its own size and set small on the left wall.
-const WIN = { x: -195, y: 92, s: 0.48 }
+// How far the furniture and the cast on the floor sit below where they were
+// first drawn. A wide window crops the top of the canvas, so the room keeps
+// low and leaves the wall above for the window and the TV.
+const DROP = 60
+// The desk sits lower still, to leave the wall between it and the TV clear.
+const DESK_DROP = 92
+// The window, drawn at its own size and set small on the left wall, over the
+// couch.
+const WIN = { x: -195, y: 266, s: 0.48 }
+// Where the cast stands at the window.
+const SILL = WIN.y + 216
 const WINDOW = `translate(${WIN.x},${WIN.y}) scale(${WIN.s})`
 // The lamp and couch, drawn further right and larger, set small on the left.
-const LOUNGE = 'translate(-171,149) scale(.78)'
-// The desk and what hangs over it, slid to the right wall.
-const DESK = 'translate(40,0)'
+const LOUNGE = `translate(-171,${149 + DROP}) scale(.78)`
+// The desk, slid to the right wall.
+const DESK = `translate(40,${DESK_DROP})`
 
 // What the desktop app's backdrop frame cannot take (found by taking the
 // scene apart, 2026-11-15): a CSS `filter`, or an `@media` rule, anywhere in
@@ -946,7 +1180,7 @@ export function buildScene(room, time = { h: 12, m: 0, s: 0 }, look = {}) {
           : isAsleep
             ? 'off'
             : 'idle'
-  const style = `<style>${CSS}</style>`
+  const style = `<style>${CSS}${look.tv ? tvNames(look.tv).css : ''}</style>`
   const cast = `<g>${shaded(mascot(room) + (hasKitten ? kitten(room) : ''), L.chars)}</g>`
 
   // The wash covers the room but not the window glass.
@@ -960,21 +1194,25 @@ export function buildScene(room, time = { h: 12, m: 0, s: 0 }, look = {}) {
 
   if (isLampOn) {
     left.push(
-      `<g transform="${LOUNGE}"><circle cx="285" cy="420" r="300" fill="url(#lampGlow)"/><path d="M258 382h54l-10-46h-34Z" fill="#fff3c9"/></g>`,
+      `<g transform="${LOUNGE}"><circle cx="285" cy="${420 + LAMP_CUT}" r="300" fill="url(#lampGlow)"/>${SHADE} fill="#fff3c9"/></g>`,
     )
   }
+  // The air conditioner runs while the mascot rests, not while it works.
+  if (!['work', 'facepalm', 'cheer', 'notice'].includes(room.mascot)) {
+    left.push(airFlow())
+  }
   if (L.beam && !room.isRaining) {
-    left.push(`<path d="M60 640H330L360 880H40Z" fill="${L.beam[0]}" opacity="${L.beam[1]}"/>`)
+    left.push(`<path d="M36 ${640 + DROP}H348L360 900H0Z" fill="${L.beam[0]}" opacity="${L.beam[1]}"/>`)
   }
   if (dim > 0.2 && screenMode !== 'off') {
-    right.push(`<ellipse cx="1420" cy="490" rx="250" ry="170" fill="url(#screenGlow)"/>`)
+    right.push(`<ellipse cx="${PC.x + PC.w / 2}" cy="490" rx="250" ry="170" fill="url(#screenGlow)"/>`)
   }
   const isSteamy = room.mascot === 'work' || room.mascot === 'facepalm'
   const steam = isSteamy
     ? [0, 1, 2]
         .map(
           i =>
-            `<path d="M${1396 + i * 4} 540q-4-6 0-12" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity="0" style="animation:steam 2.4s ${n(i * 0.8)}s infinite"/>`,
+            `<path d="M${MUG_X + 4 + i * 4} 540q-4-6 0-12" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity="0" style="animation:steam 2.4s ${n(i * 0.8)}s infinite"/>`,
         )
         .join('')
     : ''
@@ -990,11 +1228,11 @@ export function buildScene(room, time = { h: 12, m: 0, s: 0 }, look = {}) {
     style,
     rect(0, 0, W, 640, 'url(#wall)'),
     floor(),
-    `<g class="zl"><g transform="${WINDOW}">${outside(room, L)}${windowFrame(L)}</g><g transform="${LOUNGE}">${lamp(isLampOn)}${couch()}</g>${catBed()}</g>`,
-    `<g class="zr"><g transform="${DESK}">${clockCase()}${deskWall()}${desk()}${chair()}${plant()}</g></g>`,
+    `<g class="zl"><g transform="${WINDOW}">${outside(room, L)}${windowFrame(L)}</g><g transform="${LOUNGE}">${lamp(isLampOn)}${couch()}</g>${airCase()}${catBed()}${plant()}</g>`,
+    `<g class="zr"><g transform="${DESK}">${desk()}<g transform="translate(72,0)">${chair()}</g></g>${shelf()}${clockCase()}${look.tv ? tvCase() : poster()}</g>`,
     wash,
     `<g class="zl">${left.join('')}</g>`,
-    `<g class="zr"><g transform="${DESK}">${right.join('')}${screens(screenMode)}${clockFace(time, look.clock)}<rect x="1468" y="598" width="6" height="68" rx="3" fill="#ff3d7f" style="animation:pulse 2.4s infinite"/>${steam}</g></g>`,
+    `<g class="zr"><g transform="${DESK}">${right.join('')}${screens(screenMode)}${deskLamp(isSteamy, dim > 0.2)}<rect x="1468" y="598" width="6" height="68" rx="3" fill="#ff3d7f" style="animation:pulse 2.4s infinite"/>${steam}</g>${clockFace(time, look.clock)}${look.tv ? tvFace(look.tv) : ''}</g>`,
     cast,
     room.fx === 'confetti' ? confetti() : '',
     '</svg>',

@@ -1,10 +1,11 @@
-import type { Room, Wall } from '../types'
+import type { Room, Screen, Wall } from '../types'
 
 /** A wall-clock time; `s` defaults to 0. */
-export type Time = { h: number; m: number; s?: number }
+/** `day` is the date under the clock, as `dateLabel` writes it. */
+export type Time = { h: number; m: number; s?: number; day?: string }
 
 /** What the person chose in the plugin's options. */
-export type Look = { clock?: '24h' | '12h'; wall?: Wall; hasKitten?: boolean }
+export type Look = { clock?: '24h' | '12h'; wall?: Wall; hasKitten?: boolean; tv?: Screen }
 
 /** One glyph of the digital clock: lit for its slot of its column's turn. */
 export type ClockGlyph = {

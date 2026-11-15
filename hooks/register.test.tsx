@@ -1,7 +1,21 @@
 import { expect, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
-import { classify, KITTEN_POSES, MASCOT_POSES, PHASES, phaseAt, restPose } from './logic.js'
+import {
+  classify,
+  dateLabel,
+  diffStat,
+  folderName,
+  greeting,
+  KITTEN_POSES,
+  MASCOT_POSES,
+  PHASES,
+  phaseAt,
+  prState,
+  resetLabel,
+  restPose,
+  screenOf,
+} from './logic.js'
 import { buildScene, clockColumns } from './scene.js'
 
 const BACKDROP = {
@@ -165,16 +179,16 @@ test('the mod leaves the chat rows as the app draws them', async ($, on) => {
   on('session.start', (_, e) => ({ cwd: e.cwd }))
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
-  // No hook of the mod's answers for a reply: only the app would draw it.
-  await expect(
-    $.ui.mount({
-      plugin: 'lofi-theme',
-      surface: 'desktop',
-      component: 'AssistantMessage',
-      requestId: 'm1',
-      props: { text: 'hello' },
-    } as never),
-  ).rejects.toThrow(/no implementation for ui.render/)
+  // No hook of the mod's answers for a reply: what is beneath is drawn as it is.
+  const ui = await $.ui.mount({
+    plugin: 'lofi-theme',
+    surface: 'desktop',
+    component: 'AssistantMessage',
+    requestId: 'm1',
+    props: { text: 'hello' },
+  } as never)
+
+  expect(await ui.keepsBeneath()).toBe(true)
 })
 
 // The texts of the clock that are lit when the scene is first drawn.
@@ -277,4 +291,298 @@ test('a wall the build does not know falls back to slate', { options: { wall: 'n
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   expect((await drawn($)).source).toContain('#4b5663')
+})
+
+// ---------------------------------------------------------------- the TV
+
+const FULL = {
+  project: 'lofi-theme',
+  chat: 'Add a live TV to the room',
+  branch: 'main',
+  fiveHour: { percent: 42, resets: '14:30' },
+  week: { percent: 95, resets: 'Tue 09:00' },
+  context: { window: 200000, tokens: 74000, percent: 37 },
+  feed: ['turn 12', '$1.84', 'since 09:15'],
+}
+
+test('the TV fits the cap, keeps to the right side and adds no style attributes', () => {
+  for (const phase of PHASES) {
+    for (const tv of [FULL, { project: '', feed: [] }]) {
+      const svg = buildScene({ phase, mascot: 'cheer', kitten: 'prowl', fx: 'fireworks', isRaining: true, isWaiting: true }, undefined, { tv })
+
+      expect(svg.length < 131072).toBe(true)
+      expect(svg.includes('NaN') || svg.includes('undefined')).toBe(false)
+      expect(svg.includes('style="')).toBe(false)
+      expect(svg).not.toMatch(/filter|@media/)
+      for (const [, x] of svg.matchAll(/<g class="z[lr]"><g transform="translate\((-?[\d.]+),/g)) {
+        expect(Number(x) <= 360 || Number(x) >= 1225).toBe(true)
+      }
+    }
+  }
+  const room = { phase: 'day', mascot: 'phone', kitten: 'loaf', fx: 'none', isRaining: false, isWaiting: false } as const
+  const svg = buildScene(room, undefined, { tv: FULL })
+
+  expect(svg).toContain('5H 42%')
+  expect(svg).toContain('WK 95%')
+  expect(svg).toContain('CTX 37%')
+  expect(svg).toContain('74k / 200k')
+  // No TV data, no TV.
+  expect(buildScene(room)).not.toContain('tvClip')
+})
+
+test('names on the TV are escaped, and a long one pans under a clip', () => {
+  const svg = buildScene(
+    { phase: 'day', mascot: 'phone', kitten: 'loaf', fx: 'none', isRaining: false, isWaiting: false },
+    undefined,
+    { tv: { ...FULL, project: '<b>&"x" style="y"', chat: 'a chat name far too long to fit on one line of the screen' } },
+  )
+
+  expect(svg).not.toContain('<b>')
+  expect(svg).not.toContain('style="')
+  expect(svg).toContain('&#60;b&#62;&#38;')
+  // The whole name is there, and moves by a keyframe of its own.
+  expect(svg).toContain('a chat name far too long to fit on one line of the screen</text>')
+  expect(svg).toMatch(/@keyframes pana\{[^@]*translateX\(-\d+px\)/)
+  expect(svg).toContain('url(#pana)')
+  // The project's name fits: it stands still.
+  expect(svg).not.toContain('@keyframes panb')
+  // The chat's name comes before the project's, and no LIVE mark.
+  expect(svg.indexOf('a chat name')).toBeLessThan(svg.indexOf('&#60;b&#62;'))
+  expect(svg).not.toContain('>LIVE<')
+})
+
+test('the facts of the session are rounded into what the TV shows', () => {
+  const now = new Date(2026, 10, 15, 12, 0)
+  const screen = screenOf(
+    {
+      project: 'lofi-theme',
+      branch: 'feature/tv',
+      turns: 3,
+      startedAt: new Date(2026, 10, 15, 9, 5).getTime(),
+      context: { window: 200000, tokens: 74499, percent: 37.2 },
+      rateLimits: [
+        { kind: 'five_hour', percentUsed: 41.6, resetsAt: new Date(2026, 10, 15, 14, 30).toISOString() },
+        { kind: 'seven_day', percentUsed: 18.4, resetsAt: new Date(2026, 10, 17, 9, 0).toISOString() },
+      ],
+      cost: { usd: 1.837 },
+    },
+    now,
+  )
+
+  expect(screen.branch).toBe('feature/tv')
+  // A branch with no project to stand under is not shown.
+  expect(screenOf({ branch: 'main' }, now).branch).toBe(undefined)
+  expect(screen.fiveHour).toEqual({ percent: 42, resets: '14:30' })
+  expect(screen.week).toEqual({ percent: 18, resets: 'Tue 09:00' })
+  expect(screen.context).toEqual({ window: 200000, tokens: 74000, percent: 37 })
+  expect(screen.feed).toEqual(['turn 3', '$1.84', 'since 09:05'])
+  // Nothing known yet: placeholders, not zeroes.
+  expect(screenOf({}, new Date(2026, 10, 15, 19, 0))).toEqual({ project: '', chat: undefined, greeting: 'Good evening', branch: undefined, fiveHour: undefined, week: undefined, context: undefined, feed: [] })
+  expect(resetLabel(undefined)).toBe(undefined)
+  expect(resetLabel('not a date')).toBe(undefined)
+  expect(folderName('F:\\code\\lofi-theme\\')).toBe('lofi-theme')
+  expect(folderName('owner/repo')).toBe('repo')
+})
+
+test('a measurement and the name of the chat reach the TV', async ($, on) => {
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.measure', (_, e) => ({ changed: e.changed }))
+  on('classic.UserPromptSubmit', () => ({}))
+  on('classic.SessionStart', () => ({}))
+
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  let { source } = await drawn($)
+
+  // On from the start, with placeholders until the first reading.
+  expect(source).toContain('tvClip')
+  expect(source).toContain('my-project')
+  expect(source).toContain('5H --')
+
+  await $.session.measure({
+    context: { window: 200000, tokens: 74000, percent: 37 },
+    rateLimits: [
+      { kind: 'five_hour', percentUsed: 41.6 },
+      { kind: 'seven_day', percentUsed: 18 },
+    ],
+    cost: { usd: 1.84 },
+    changed: ['context', 'rateLimits', 'cost'],
+  })
+  await $.classic.UserPromptSubmit({ prompt: 'hello', session_title: 'Fix <the> clock' })
+  source = (await drawn($)).source
+
+  expect(source).toContain('5H 42%')
+  expect(source).toContain('WK 18%')
+  expect(source).toContain('CTX 37%')
+  expect(source).toContain('$1.84')
+  expect(source).toContain('Fix &#60;the&#62; clock')
+
+  // A compaction is the same chat; /clear is a new one.
+  await $.classic.SessionStart({ source: 'compact' })
+  expect((await drawn($)).source).toContain('Fix &#60;the&#62; clock')
+  await $.classic.SessionStart({ source: 'clear' })
+  source = (await drawn($)).source
+  expect(source).not.toContain('Fix &#60;the&#62; clock')
+  expect(source).toMatch(/Good (morning|afternoon|evening|night)/)
+})
+
+test('the tv option takes the TV down', { options: { tv: false } }, async ($, on) => {
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.measure', (_, e) => ({ changed: e.changed }))
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.session.measure({ context: { window: 200000 }, rateLimits: [], changed: ['context'] })
+  expect((await drawn($)).source).not.toContain('tvClip')
+})
+
+test('the TV colours its figures and greets where a name is missing', () => {
+  const room = { phase: 'day', mascot: 'phone', kitten: 'loaf', fx: 'none', isRaining: false, isWaiting: false } as const
+  const at = (percent: number) => buildScene(room, undefined, { tv: { project: 'p', chat: 'c', feed: [], fiveHour: { percent }, context: { window: 100, percent } } })
+
+  // Green to half, yellow past it, red past four fifths: the text and the bar.
+  expect(at(50)).toMatch(/fill="#7ae582">5H 50%/)
+  expect(at(51)).toMatch(/fill="#ffd23f">5H 51%/)
+  expect(at(81)).toMatch(/fill="#ff5d6c">5H 81%/)
+  expect(at(81)).toMatch(/fill="#ff5d6c">CTX 81%/)
+  expect(at(20)).toMatch(/fill="#7ae582">CTX 20%/)
+
+  expect(greeting(9, 'ada')).toBe('Good morning, Ada')
+  expect(greeting(14)).toBe('Good afternoon')
+  expect(greeting(19, ' ')).toBe('Good evening')
+  expect(greeting(2, 'ada')).toBe('Good night, Ada')
+  const evening = new Date(2026, 10, 15, 19, 0)
+
+  expect(screenOf({ user: 'ada' }, evening).greeting).toBe('Good evening, Ada')
+  expect(screenOf({ project: 'p', chat: 'c', user: 'ada' }, evening).greeting).toBe(undefined)
+  expect(buildScene(room, undefined, { tv: screenOf({ user: 'ada' }, evening) })).toContain('Good evening, Ada')
+  // With the project known, the greeting takes the chat's line.
+  expect(buildScene(room, undefined, { tv: screenOf({ project: 'p', user: 'ada' }, evening) })).toContain('Good evening, Ada')
+})
+
+test('the date stands under the clock, and the air conditioner runs at rest', () => {
+  const room = { phase: 'day', mascot: 'phone', kitten: 'prowl', fx: 'none', isRaining: false, isWaiting: false } as const
+
+  expect(dateLabel(new Date(2026, 10, 15))).toBe('SUN 15 NOV')
+  const svg = buildScene(room, { h: 20, m: 29, s: 0, day: 'SUN 15 NOV' })
+
+  expect(svg).toContain('>SUN 15 NOV</text>')
+  expect(clockShows(svg)).toBe(clockShows(buildScene(room, { h: 20, m: 29, s: 0 })))
+  expect(svg).toContain('animation:cool')
+  expect(buildScene({ ...room, mascot: 'work' })).not.toContain('animation:cool')
+})
+
+test('the ticker says each thing once, and warns of what is running out', () => {
+  const room = { phase: 'day', mascot: 'phone', kitten: 'loaf', fx: 'none', isRaining: false, isWaiting: false } as const
+  const calm = buildScene(room, undefined, { tv: FULL })
+
+  expect(calm.split('turn 12').length).toBe(2)
+  // A line that fits does not slide.
+  expect(calm).not.toContain('animation:tick')
+  const tight = screenOf({
+    rateLimits: [
+      { kind: 'five_hour', percentUsed: 86 },
+      { kind: 'seven_day', percentUsed: 91 },
+    ],
+    context: { window: 200000, tokens: 170000, percent: 85 },
+  })
+
+  expect(tight.feed).toEqual(['Low on 5h usage!', 'Low on weekly usage!', 'Context limit reaching soon!'])
+  expect(buildScene(room, undefined, { tv: tight })).toContain('animation:tick')
+  expect(screenOf({ rateLimits: [{ kind: 'five_hour', percentUsed: 80 }] }).feed).toEqual([])
+})
+
+test('the branch stands under the project, and follows a checkout', async ($, on) => {
+  let branch = 'main'
+
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('classic.UserPromptSubmit', () => ({}))
+  on('process.run', () => (branch === '' ? { value: { exitCode: 128, stdout: '', stderr: 'not a git repository', isStdoutTruncated: false, isStderrTruncated: false } } : { value: { exitCode: 0, stdout: `${branch}
+`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  expect((await drawn($)).source).toContain('>main</text>')
+
+  // Changed outside the session: the next prompt reads it again.
+  branch = 'fix/clock'
+  await $.classic.UserPromptSubmit({ prompt: 'go on' })
+  let { source } = await drawn($)
+
+  expect(source).toContain('>fix/clock</text>')
+  expect(source).not.toContain('>main</text>')
+
+  // No repository, no branch line.
+  branch = ''
+  await $.classic.UserPromptSubmit({ prompt: 'and now' })
+  source = (await drawn($)).source
+  expect(source).not.toContain('>fix/clock</text>')
+  expect(source).not.toContain('url(#panc)')
+})
+
+test('what is not committed and the pull request are read into a few words', () => {
+  expect(diffStat(' 3 files changed, 133 insertions(+), 32 deletions(-)\n')).toEqual({ added: 133, removed: 32 })
+  expect(diffStat(' 1 file changed, 1 insertion(+)\n')).toEqual({ added: 1, removed: 0 })
+  expect(diffStat('')).toBe(undefined)
+  expect(diffStat('fatal: bad revision')).toBe(undefined)
+
+  const pr = (more: object) => JSON.stringify({ state: 'OPEN', isDraft: false, reviewDecision: '', statusCheckRollup: [], ...more })
+  const run = (conclusion: string, status = 'COMPLETED') => ({ __typename: 'CheckRun', status, conclusion })
+
+  expect(prState(pr({}))).toBe('open')
+  expect(prState(pr({ isDraft: true }))).toBe('draft')
+  expect(prState(pr({ statusCheckRollup: [run('SUCCESS'), run('SKIPPED')] }))).toBe('passing')
+  expect(prState(pr({ statusCheckRollup: [run('SUCCESS'), run('', 'IN_PROGRESS')] }))).toBe('pending')
+  expect(prState(pr({ statusCheckRollup: [{ __typename: 'StatusContext', state: 'PENDING' }] }))).toBe('pending')
+  // The worst news wins.
+  expect(prState(pr({ isDraft: true, reviewDecision: 'CHANGES_REQUESTED', statusCheckRollup: [run('FAILURE'), run('', 'QUEUED')] }))).toBe('failing')
+  expect(prState(pr({ reviewDecision: 'CHANGES_REQUESTED', statusCheckRollup: [run('SUCCESS')] }))).toBe('changes')
+  expect(prState(pr({ state: 'MERGED' }))).toBe('merged')
+  expect(prState(pr({ state: 'CLOSED' }))).toBe('closed')
+  expect(prState('no pull requests found')).toBe(undefined)
+  expect(prState('null')).toBe(undefined)
+})
+
+test('the diff and the pull request stand beside the branch, and go with it', async ($, on) => {
+  let branch = 'main'
+  let pull = JSON.stringify({ state: 'OPEN', isDraft: false, reviewDecision: '', statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'FAILURE' }] })
+  const out = (stdout: string, exitCode = 0) => ({ value: { exitCode, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } })
+
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('classic.UserPromptSubmit', () => ({}))
+  on('process.run', (_, e) => {
+    const argv = (e as unknown as { argv: readonly string[] }).argv
+
+    if (argv[0] === 'gh') return pull === '' ? out('', 1) : out(pull)
+
+    return argv[1] === 'branch' ? out(`${branch}\n`) : out(' 2 files changed, 1204 insertions(+), 32 deletions(-)\n')
+  })
+
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  await $.classic.UserPromptSubmit({ prompt: 'one' })
+  let { source } = await drawn($)
+
+  expect(source).toContain('>+1.2k</tspan>')
+  expect(source).toContain('>/</tspan>')
+  expect(source).toContain('>-32</tspan>')
+  // The card: an Open label, and the checks beside it.
+  expect(source).toContain('>Open</text>')
+  expect(source).toContain('>checks failing</text>')
+  // Failing checks: the red disc.
+  expect(source).toContain('<circle r="4.5" fill="#ff5d6c"/>')
+
+  // Another branch with no pull request: the mark goes.
+  branch = 'throwaway'
+  pull = ''
+  await $.classic.UserPromptSubmit({ prompt: 'two' })
+  await $.classic.UserPromptSubmit({ prompt: 'three' })
+  source = (await drawn($)).source
+  expect(source).toContain('>throwaway</text>')
+  expect(source).not.toContain('<circle r="4.5" fill="#ff5d6c"/>')
+  expect(source).not.toContain('>Open</text>')
 })

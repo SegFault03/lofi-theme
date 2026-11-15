@@ -1,6 +1,6 @@
 {
   "name": "lofi-theme",
-  "version": "0.2.0",
+  "version": "0.5.2",
   "description": "A lofi living room behind the chat in the Claude desktop app: the light follows your clock, and an orange mascot and a kitten react to what the session is doing.",
   "author": {
     "name": "SegFault03"
@@ -68,6 +68,12 @@
       "type": "boolean",
       "title": "Rainy days",
       "description": "About one day in five it rains outside the window. Off keeps the sky clear.",
+      "default": true
+    },
+    "tv": {
+      "type": "boolean",
+      "title": "Wall TV",
+      "description": "A TV on the wall that shows your 5-hour and weekly usage, the project and chat, and how full the context is. Off takes it down.",
       "default": true
     }
   }

@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  plugin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The engine checks and tests the plugin itself, and needs no sign-in for
+      # either. Not pinned: the plugin has to keep working on the current engine.
+      - run: npm install --global @anthropic-ai/claude-code
+      - run: claude --version
+      # Manifest, marketplace, hooks module, state keys.
+      - run: claude plugin validate .
+      # The scene's rules and the hooks, against the engine's own test kit.
+      - run: claude plugin test .
