@@ -8,6 +8,7 @@
 import { createServer } from 'node:http'
 
 import { buildScene } from '../hooks/scene.js'
+import { dateLabel, greeting } from '../hooks/logic.js'
 
 const PORT = Number(process.env.PORT ?? 4173)
 
@@ -26,11 +27,29 @@ function page(query) {
     h: number('h', now.getHours()),
     m: number('m', now.getMinutes()),
     s: number('s', now.getSeconds()),
+    day: dateLabel(now),
   }
   const look = {
     clock: query.get('clock') ?? '24h',
     wall: query.get('wall') ?? 'slate',
     hasKitten: !query.has('nokitten'),
+    // &tv=1 for sample figures, &tv=empty for a session with none yet.
+    tv: !query.has('tv')
+      ? undefined
+      : query.get('tv') === 'empty'
+        ? { project: '', greeting: greeting(now.getHours(), 'ada'), context: { window: 200000 }, feed: ['turn 0', 'just started'] }
+        : {
+            project: query.get('project') ?? 'lofi-theme',
+            chat: query.get('chat') ?? 'Add a live TV to the room',
+            branch: query.has('nobranch') ? undefined : (query.get('branch') ?? 'main'),
+            // &diff=133,32 and &pr=failing (or any state) for the branch line.
+            diff: query.has('diff') ? { added: Number(query.get('diff').split(',')[0]), removed: Number(query.get('diff').split(',')[1] ?? 0) } : undefined,
+            pr: query.get('pr') ?? undefined,
+            fiveHour: { percent: number('p5', 42), resets: '14:30' },
+            week: { percent: number('pw', 18), resets: 'Tue 09:00' },
+            context: { percent: number('ctx', 37), tokens: number('ctx', 37) * 2000, window: 200000 },
+            feed: ['turn 12', '$1.84', 'since 09:15', ...(number('p5', 42) > 80 ? ['Low on 5h usage!'] : []), ...(number('pw', 18) > 80 ? ['Low on weekly usage!'] : []), ...(number('ctx', 37) > 80 ? ['Context limit reaching soon!'] : [])],
+          },
   }
   const drawn = buildScene(room, time, look)
   // The app crops the room to fill the window; `fit` shows all of it instead.

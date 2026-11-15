@@ -18,11 +18,12 @@ each milestone or change of direction.
 | `hooks/hooks.json` | Names the one hooks module. |
 | `hooks/register.tsx` | Event wiring. Session facts live in the module object `S`, the options in `O`, what is drawn in `$.state`. |
 | `hooks/scene.js` | `buildScene(room, time, look)`: the whole backdrop as one SVG string. Pure. |
-| `hooks/logic.js` | Pure decisions: phase by hour, rest and kitten poses, shell-command classification, rainy days. |
+| `hooks/logic.js` | Pure decisions: phase by hour, rest and kitten poses, shell-command classification, rainy days, what the TV shows. |
 | `hooks/*.d.ts` | Types for the two `.js` files. Keep them in step by hand. |
-| `types/index.d.ts` | The `$.state` contract (`lofi-theme.room`, `lofi-theme.resync`) and the shared types. |
+| `types/index.d.ts` | The `$.state` contract (`lofi-theme.room`, `lofi-theme.resync`, `lofi-theme.tv`) and the shared types. |
 | `hooks/register.test.tsx` | Tests, run by the engine's own kit. |
 | `tools/preview.mjs` | Local preview server. Not part of the plugin. |
+| `.github/workflows/ci.yml` | CI: `claude plugin validate .` and `claude plugin test .` on each pull request and on `main`. |
 
 ## Commands
 

@@ -3,7 +3,7 @@
 A mod for the Claude Code desktop app: a time-aware living room drawn behind
 the chat, where an orange mascot and a kitten react to what the session does.
 
-## State (2026-11-15, fourteenth round)
+## State (2026-11-15, seventeenth round)
 
 The mod is now this repository, github.com/SegFault03/lofi-theme (public; the
 local folder is still called `claude-lofi-theme`). The plugin and the
@@ -13,7 +13,252 @@ refuses it). Earlier rounds call it `living-room`, which is
 still the backdrop's scene id. Work here; the copies in the per-session
 dev-mods folders are gone.
 
-**Done this round**
+**Status TV, air conditioner, date: version 0.4.0 (2026-11-15, seventeenth round; not committed)**
+
+The user saw 0.3.1 in the app (1907x960): it animates, the project and the
+chat's name both show, the text reads. This round, on their list. Where a
+number here differs from the 0.3.1 notes below, this one holds.
+
+- TV higher, `TV.y` 106: about 10 units under the top of the user's window,
+  like a status board. It cannot be pinned to the viewport's top (the crop
+  depends on the window's shape and the SVG has no way to know it), so a
+  16:9 window shows more wall above it and a wider one crops into it.
+- The desk has its own `DESK_DROP` (92); the shelf group is at
+  `translate(40,116)` and the clock at `CLOCK_AT` 1474,433. The chair, the
+  mascot's desk spot (x 1350), the keyboard and the desk lamp moved right.
+- Figures on the TV are coloured by `heat(p)`: green to 50, yellow above,
+  red above 80. Both rings, their two lines, the centre number, `CTX` and
+  its bar. The tracks are grey.
+- Greeting: `Screen.greeting` (shape `tv-2`), from `greeting(hour, name)`
+  in `logic.js`, set by `screenOf` while the project or the chat's name is
+  missing. It takes the project's line, or the chat's line when only that
+  is missing. The name is the login name, `$.env.get('USERNAME')` then
+  `'USER'`, read once in `air` (`F.user`). No option for another name yet.
+- Date under the clock (`SUN 15 NOV`): `time.day`, from `dateLabel`. Plain
+  text, so the minute tick bumps `resync` when the day turns. The clock's
+  case is taller (72).
+- Floor, to keep clear of the plant (canvas x up to 110): `walk` is 165 px
+  from x 156; yarn at x 168; play at 168 with the pounce at 228; the bed at
+  `BED_X` 300.
+- Air conditioner over the window (`AC`, `airCase` under the wash,
+  `airFlow` over it): runs for every pose but work, facepalm, cheer and
+  notice. One new keyframe, `cool` (opacity and translateY, as `steam`).
+- Ticker: each item once. A line of 44 characters or fewer stands still
+  (no animation); a longer one slides (`tick`, now 232 to -600 px in 30 s).
+  `screenOf` adds a warning for each of five hours, week and context that
+  is above 80.
+- Usage figures: still pushed by `session.measure` (after each main turn,
+  and when a window moves a whole point). The user saw them lag, so the
+  minute tick now also calls `gauge` then `air`. Both read what the last
+  response of this session reported: use by other sessions shows only
+  after the next reply here, and nothing in the engine gives it sooner.
+- Chat's name after a reload: it was lost twice over. The shape bump to
+  `tv-2` dropped the stored screen (once), and `classic.SessionStart` set
+  `hasHeardTitle` even when it brought no title, so `air` would not take
+  the name back from the stored screen. Now it is set only with a title or
+  a /clear. The user confirmed the name returns with the next prompt.
+- The line "lofi-theme: no attached desktop or mobile client" under the
+  prompt came from `dress`: at a reload `$.theme.set` answers
+  `isDrawn: false` though the theme stands (it has a `requestId`) and is
+  drawn when the client attaches. `dress` now shows a status only when
+  there is no `requestId`, and clears it otherwise.
+- Audit for leaks (2026-11-15), nothing found that grows:
+  timers are one `clock.every` (now kept in `S.tick` and cancelled before
+  it is set again), `S.showTimer` and `S.noticeTimer` (each cancelled or
+  run out), and one `clock.after` per tool call, cancelled in `finally`. A
+  hot reload cancels them all (engine's rule). `S` and `F` are fixed in
+  size; `buildScene` keeps nothing. The standing cost is the drawing: 62
+  animated elements of 343 on a plain day, up to 186 of 791 with rain and
+  fireworks at night, redrawn whole on each state write. The minute tick
+  makes about four engine calls. Left running by an earlier session: a
+  preview server on port 4173 (which is why later ones land on 4174/4175).
+- 0.4.1, the TV's names: the chat's name is the large top line and the
+  project's the small one under it, with a folder icon. No LIVE mark. The
+  greeting takes the top line while there is no chat name. `fit` no longer
+  cuts the names: `nameLine` lets one that fits stand still, and pans a
+  longer one (up to 80 characters) to its end and back under its own clip
+  path, by a keyframe written for its length (`pana`, `panb`; translate
+  only) that `buildScene` adds to the style block. Seen in the preview with
+  48-character names; not seen in the app, where a keyframe made per name
+  is new.
+- 0.4.2, the branch: a third line under the project's, with a branch mark
+  (`Screen.branch`, pan keyframe `panc`). No model on the TV any more
+  (`Screen.model` and the `$.session.model()` call are gone), so the names
+  start higher. `scout` in `register.tsx` runs
+  `git branch --show-current` through `$.process.run` (3 s limit): no
+  repository, a detached head or no git gives no line. It is read at the
+  start, with each prompt, after any shell tool call whose command names
+  git, and on the minute tick (for a checkout made outside the session,
+  seen within a minute). The shape tag stayed `tv-2`: an optional field
+  more, and a bump would drop the stored chat name at the reload.
+- No polling (the user's call, 2026-11-15): the minute tick no longer
+  reads usage or the branch. Usage comes only by `session.measure` (and
+  `gauge` at the start, /clear and compaction); the branch at the start,
+  with each prompt and after a shell command that names git. The tick
+  still asks for the project's name while it is missing, and no longer
+  once it is there. This replaces what the notes above and below say of
+  a once-a-minute read.
+- 0.5.0, beside the branch: what is not committed (`+1.2k -32`,
+  `Screen.diff`) and a mark for the branch's pull request (`Screen.pr`, a
+  `PrState`). `scout` adds `git diff --shortstat HEAD` (tracked files,
+  staged or not; new untracked files are not counted). `survey` runs
+  `gh pr view --json state,isDraft,reviewDecision,statusCheckRollup`
+  (10 s limit); `prState` in `logic.js` makes one word of it, the worst
+  news first: failing, changes, pending, draft, passing, open; merged and
+  closed. `survey` goes over the network, so it is started and not
+  awaited, and airs the screen itself. If `gh` cannot start (or times
+  out) it is not tried again until a reload (`hasGh`). Read at the start,
+  with each prompt, at the end of each main turn, and after a shell
+  command that names git or gh. Nothing is polled, so a check that
+  finishes on GitHub shows at the next of those. `prMark` in `scene.js`
+  draws the eight marks; `&diff=133,32&pr=failing` in the preview.
+  Checked: validate, 25 tests, `tsc`; the marks `failing` and `merged` in
+  the preview. Not checked: a real pull request, and the app.
+  The user saw the branch and the diff update in the app on a throwaway
+  branch; that branch is deleted and the tree is back on `main`.
+- 0.5.1: the TV is 16 taller (`TV.h` 164, bottom at canvas y 344) and the
+  pull request has a line of its own under the branch: `prCard`, a rounded
+  label as GitHub draws one (Open green, Draft grey, Merged purple, Closed
+  red) and, for an open one with news, the disc from `prMark` with
+  "checks running / failing / passed" or "changes requested". With no
+  request the line stays empty; the lines under it do not move up. The
+  diff reads `+132/-64`. Seen in the preview (failing, merged, none); not
+  in the app. Still nothing committed: the user wants to see the diff
+  figure on `main` first.
+
+- 0.5.2: the diff figure stands right after the branch name (it was at
+  the right end), the branch line is larger (9.5, the figure 8.5) and sits
+  further under the project line; the quota lines moved down 2.
+
+- CI (2026-11-15): `.github/workflows/ci.yml` installs the current
+  `@anthropic-ai/claude-code` from npm and runs validate and test, the two
+  checks that need nothing but the engine (both ran here with an empty
+  config folder, so no sign-in). Not pinned, by choice: a kit change like
+  the one in `$.ui.mount` will fail CI, which is the news wanted. `tsc` is
+  left out: its types are written by the engine on load and are not in git.
+- All of the above was committed on the branch `tv-status-board` and a
+  pull request opened from it; the TV's card can now be checked against it.
+
+**Next step for a new session:** the user checks 0.5.2 in the app after
+`/reload-plugins`, then the pull request card against a real pull request
+(open one from a branch; `gh` is installed). Commit only when asked, on a
+branch, not on `main`. An old preview server from an earlier session may
+still hold port 4173.
+
+- The failing test was the kit: `$.ui.mount` now resolves with a handle
+  where it used to refuse. The test asks `keepsBeneath()` instead.
+
+Checked: validate passes (two standing warnings), `claude plugin test .`
+22 pass, `tsc -p .` clean. Preview at 1907x960: dusk/phone/prowl with a
+full TV (62, 91, 85), night/work/yarn with the empty TV and the greeting.
+
+Not checked in the app: the new keyframe `cool` and the still ticker
+(either could matter to animation), the login name, the date at midnight.
+Open: the desk top (y 652) now sits below the skirting line (640); it reads
+as nearer the viewer, like the couch, but the user has not said.
+
+**New layout, version 0.3.1 (2026-11-15, sixteenth round; not committed)**
+
+The user saw 0.3.0 in the app (1902x956): the TV was too small to read, and
+the room wasted the floor. That window crops the top 96 canvas units
+(`xMidYMax slice`), so the room now keeps low. This replaces the positions
+given in the 0.3.0 notes below.
+
+- `DROP = 60` in `scene.js` lowers the couch, lamp, desk, chair and every
+  floor and furniture spot of the cast. `SILL` (from `WIN`) places the cast
+  at the window.
+- TV: right wall over the desk, `TV = { x: 1232, y: 150, s: 1.45 }` (canvas
+  x 1232..1580, y 150..365). It is still drawn 240 x 148 and scaled, which
+  is what makes the text bigger (8 becomes 11.6). With no TV the poster
+  hangs there. `tvFace` now goes in the right group, over the wash.
+- Shelf (wider, y to 444) under the TV; the clock stands on it
+  (`CLOCK_AT` 1474,403); one row of notes under it.
+- Desk: one monitor (`PC`), moved right; the second is gone. A desk lamp at
+  the left end of the desk (`deskLamp`; the mascot sits between it and the monitor), lit while the mascot is at the desk, with a
+  glow in the dark phases.
+- Left: window lower (`WIN.y` 266), floor lamp shorter (`LAMP_CUT`), the
+  kitten's bed at `BED_X` 190, the plant at the left edge (x 58).
+- Names on the TV: the project was blank in a new session in the app (cause
+  not found; the chat's name did arrive with the second prompt). `air` now
+  asks again whenever the project is missing (`$.session.repo().root`, then
+  `$.session.cwd()`, then what the screen already shows), and the minute
+  tick calls `air` while either name is missing. The chat's name has no
+  call to ask: it comes only with `session_title` on the classic events.
+
+Checked: `claude plugin validate .` passes (same two warnings);
+`tsc -p .` clean; `claude plugin test .` 18 pass, 1 fail: "the mod leaves
+the chat rows as the app draws them" (`$.ui.mount` now resolves where the
+test expects a refusal). The committed code also has one failing test, so
+this looks like a change in the engine, not this round; not looked into.
+Preview at 1902x956: night/work/desk and day/window/sleep with the TV, day
+without. At 1280x800 the crop takes about 89 units a side, so the TV's
+right fifth (the model's name, line ends) is cut.
+
+Not checked in the app: that the room still animates, that the project's
+name now appears, and the size of the text.
+
+**Wall TV, version 0.3.0 (2026-11-15, fifteenth round; not committed)**
+
+A TV, first on the left wall between the window and the couch (moved in
+0.3.1, above). It shows two quota rings (week outside, five
+hours inside), the project and chat name, the model, a context bar and a
+ticker (turn count, cost, when the session began). Option `tv`, on by
+default.
+
+How it is built:
+
+- `scene.js`: `tvCase()` under the wash, `tvFace(tv)` over it, drawn only
+  when `look.tv` (a `Screen`, in `types/index.d.ts`) is given. The rings
+  are static dashes. One new keyframe, `tick` (translate only), moves the
+  ticker under a clip path. Names are escaped and cut to fit.
+- `logic.js`: `screenOf(facts)` rounds the session's facts into a `Screen`
+  (whole percents, tokens to the thousand, cost to the cent), so the scene is
+  redrawn only when a figure visibly moves. `resetLabel`, `folderName`.
+- `register.tsx`: a third state key, `lofi-theme.tv` (shape `tv-1`). The
+  facts sit in the module object `F`. `tune` fills them at `session.start`
+  (`$.session.repo()`'s name, else the folder's; `$.session.usage()`);
+  `session.measure` brings the quota windows, the context and the cost after
+  each turn and when a window moves a whole point; `air` writes the screen
+  when it differs. The chat's name comes only from `session_title` on
+  `classic.SessionStart` and `classic.UserPromptSubmit`, so a rename or the
+  first auto-title reaches the TV at the next prompt. `classic.SessionStart`
+  also re-reads the figures (`gauge`), since `session.start` does not fire
+  on /clear; it drops the chat's name on a /clear and keeps it on a
+  compaction.
+- `tools/preview.mjs`: `&tv=1` (with `p5`, `pw`, `ctx`, `chat`,
+  `project`) or `&tv=empty`. `.claude/launch.json` starts the preview in
+  the app's browser pane.
+
+Decided: the TV has its own state key rather than fields on `Room`, so
+`/room` pins and the pose logic are untouched. A measurement lands just after
+the turn's own pose write, so a turn's end can redraw the scene twice. No
+live reset countdown (it would need the clock's CSS trick) and no branch name
+(not in `SessionRepo`; it would need git through `$.process`).
+
+**Checked** (2026-11-15): `claude plugin validate .` passes with its two
+standing warnings (no icon; CLAUDE.md at the root is not loaded as context);
+`claude plugin test .` 19 pass; `tsc -p .` clean (TypeScript 5.9.3 through
+npx). Preview in Chromium: day, dusk and night with the phone, scroll, nap,
+sleep and window poses, full and empty screens. At 1600x900 and 1280x800 the
+whole TV shows; at 1100x800 the crop takes its left third (the rings), as it
+takes the window and couch.
+
+**Not checked: the desktop app.** Ask the user:
+
+1. Is the room still moving with the TV on? If it is frozen, `tick` (a
+   moving `<text>` under a clip path) is the suspect: turn the `tv` option
+   off to confirm.
+2. Do the rings and the context bar show real figures after the first reply?
+   Nothing has confirmed that the app raises `session.measure` or fills
+   `rateLimits`.
+3. Does the chat's name appear after the second prompt? Whether the app
+   fills `session_title` is not known. If it never does, drop the line or
+   find another source.
+4. Can the text be read? It is about 8 px at a 1600 px window. If not, the
+   wall has little room: the sill ends at y 316 and a waiting thought bubble
+   tops out near y 474, so growing it means moving the window or the couch.
+
+**Done in the fourteenth round**
 
 - **Digital clock** in place of the analog one, hours and minutes, 24-hour by
   default. It keeps time by CSS, with no redraw each minute: `clockColumns`
