@@ -1,0 +1,1002 @@
+// The living room, drawn as one SVG string. Pure: the same room state and
+// time always give the same document, so a redraw never reshuffles the books.
+//
+// Canvas is 1600 x 900. The wall meets the floor at y = 640. The middle, where
+// the chat sits, stays bare wall and floor. Left side: the window over the
+// couch, the lamp, the cat bed. Right side: the plant, the digital clock and
+// the desk.
+
+const W = 1600
+const H = 900
+// The walls on offer, top to bottom: each dark enough that the chat's panels
+// stand off it. `slate` is the one the room was drawn for.
+export const WALLS = {
+  slate: ['#4b5663', '#566270'],
+  plum: ['#54485f', '#60536c'],
+  forest: ['#45584f', '#50645a'],
+  clay: ['#65514b', '#715c55'],
+}
+
+// One row per lighting phase. `sky` is top and bottom of the window gradient,
+// `orb` the sun or moon [x, y, r, color], `tint`/`dim` the wash over the room,
+// `chars` how bright the mascot and kitten stay under it.
+const LIGHT = {
+  dawn: {
+    sky: ['#f29c86', '#fde6c4'],
+    orb: [578, 398, 34, '#ffe2b0'],
+    stars: 0,
+    cloud: ['#ffd9cf', 0.8],
+    city: '#9a86a6',
+    hill: '#c7a9b4',
+    lit: 0.35,
+    tint: '#5a3c78',
+    dim: 0.14,
+    lamp: 0,
+    chars: 0.96,
+    beam: ['#ffd9b0', 0.12],
+  },
+  day: {
+    sky: ['#5aa5e6', '#d7edf8'],
+    orb: [800, 182, 30, '#fff6c2'],
+    stars: 0,
+    cloud: ['#ffffff', 0.92],
+    city: '#86a2bd',
+    hill: '#a9c6b4',
+    lit: 0,
+    tint: '#000000',
+    dim: 0,
+    lamp: 0,
+    chars: 1,
+    beam: ['#fff7d6', 0.18],
+  },
+  golden: {
+    sky: ['#ee7b43', '#fcd795'],
+    orb: [1012, 378, 38, '#ffc063'],
+    stars: 0,
+    cloud: ['#ffd0a0', 0.75],
+    city: '#8d5b54',
+    hill: '#b97b5e',
+    lit: 0.25,
+    tint: '#ff8a3c',
+    dim: 0.12,
+    lamp: 0,
+    chars: 0.98,
+    beam: ['#ffb768', 0.24],
+  },
+  dusk: {
+    sky: ['#29265a', '#d26a6c'],
+    orb: null,
+    stars: 0.45,
+    cloud: ['#8f6f9c', 0.4],
+    city: '#1f1c40',
+    hill: '#3a2f5c',
+    lit: 0.85,
+    tint: '#221c52',
+    dim: 0.34,
+    lamp: 1,
+    chars: 0.88,
+    beam: null,
+  },
+  night: {
+    sky: ['#070c22', '#1c2754'],
+    orb: [985, 196, 26, '#f3f0dc'],
+    stars: 1,
+    cloud: ['#3b4470', 0.35],
+    city: '#0b1130',
+    hill: '#141b44',
+    lit: 1,
+    tint: '#070a24',
+    dim: 0.54,
+    lamp: 1,
+    chars: 0.78,
+    beam: ['#b8c8ff', 0.07],
+  },
+}
+
+// A small seeded generator (mulberry32).
+function rng(seed) {
+  let a = seed >>> 0
+
+  return () => {
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+const n = v => Math.round(v * 10) / 10
+
+function rect(x, y, w, h, fill, extra = '') {
+  return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" fill="${fill}" ${extra}/>`
+}
+
+// `.c` turns about its own middle, `.f` about its feet, `.t` about its top.
+const CSS = `
+.c{transform-box:fill-box;transform-origin:center}
+.f{transform-box:fill-box;transform-origin:50% 100%}
+.t{transform-box:fill-box;transform-origin:50% 0}
+.l{transform-box:fill-box;transform-origin:0 50%}
+text{font-family:ui-monospace,Consolas,Menlo,monospace;font-weight:700}
+@keyframes breathe{50%{transform:scaleY(1.045)}}
+@keyframes bob{50%{transform:translateY(-3px)}}
+@keyframes tap{50%{transform:translateY(5px)}}
+@keyframes zz{0%{opacity:0;transform:translate(0px,0px)}20%{opacity:1}100%{opacity:0;transform:translate(26px,-48px)}}
+@keyframes sway{0%,100%{transform:rotate(-13deg)}50%{transform:rotate(13deg)}}
+@keyframes leaf{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2.5deg)}}
+@keyframes hop{0%,100%{transform:translateY(0)}35%{transform:translateY(-16px)}70%{transform:translateY(0)}}
+@keyframes jump{0%,100%{transform:translateY(0px)}45%{transform:translateY(-62px)}}
+@keyframes tw{50%{opacity:.2}}
+@keyframes drift{from{transform:translateX(-300px)}to{transform:translateX(640px)}}
+@keyframes rain{to{transform:translate(-22px,110px)}}
+@keyframes burst{0%,40%{transform:scale(.05)}100%{transform:scale(1)}}
+@keyframes glow{0%,40%{opacity:0}46%{opacity:1}70%{opacity:1}100%{opacity:0}}
+@keyframes rise{0%{transform:translateY(170px);opacity:.9}40%{transform:translateY(0);opacity:.9}41%,100%{opacity:0}}
+@keyframes flash{0%,40%{opacity:0}47%{opacity:.5}100%{opacity:0}}
+@keyframes fall{from{transform:translateY(-90px)}to{transform:translateY(1000px)}}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+@keyframes steam{0%{opacity:0;transform:translateY(0)}30%{opacity:.7}100%{opacity:0;transform:translateY(-24px)}}
+@keyframes type{0%{transform:scaleX(0)}55%,100%{transform:scaleX(1)}}
+@keyframes clkh{0%{opacity:1}4.16667%,100%{opacity:0}}
+@keyframes clkt{0%{opacity:1}16.66667%,100%{opacity:0}}
+@keyframes clko{0%{opacity:1}10%,100%{opacity:0}}
+@keyframes walk{0%,100%{transform:translateX(0px)}50%{transform:translateX(280px)}}
+@keyframes face{0%{transform:scaleX(1)}50%,100%{transform:scaleX(-1)}}
+@keyframes step{50%{transform:translateY(-4px)}}
+@keyframes tilt{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(7deg)}}
+@keyframes roll{0%,100%{transform:translateX(0px)}50%{transform:translateX(18px)}}
+@keyframes saver{0%,100%{transform:translate(0,0)}25%{transform:translate(64px,30px)}50%{transform:translate(22px,46px)}75%{transform:translate(76px,10px)}}
+@keyframes flip{0%,70%{transform:rotate(0)}100%{transform:rotate(180deg)}}
+@keyframes pulse{50%{opacity:.5}}
+@keyframes pop{0%{transform:scale(0)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}}
+`
+
+// ---------------------------------------------------------------- outside
+
+const PANES = [
+  [512, 186],
+  [706, 188],
+  [902, 186],
+]
+const GLASS = { x: 512, y: 122, w: 576, h: 316 }
+
+function outside(room, L) {
+  const r = rng(7)
+  const out = []
+  const isShow = room.fx === 'fireworks'
+
+  out.push(rect(GLASS.x, GLASS.y, GLASS.w, GLASS.h, 'url(#sky)'))
+
+  if (L.stars > 0 || isShow) {
+    const opacity = Math.max(L.stars, isShow ? 0.5 : 0)
+
+    for (let i = 0; i < 42; i++) {
+      const x = GLASS.x + r() * GLASS.w
+      const y = GLASS.y + r() * 200
+      const size = 0.8 + r() * 1.3
+      out.push(
+        `<circle cx="${n(x)}" cy="${n(y)}" r="${n(size)}" fill="#fff" opacity="${n(opacity)}" style="animation:tw ${n(2 + r() * 3)}s ${n(-r() * 4)}s infinite"/>`,
+      )
+    }
+  }
+
+  if (L.orb && !room.isRaining) {
+    const [x, y, size, color] = L.orb
+    out.push(
+      `<circle cx="${x}" cy="${y}" r="${size * 2.1}" fill="${color}" opacity=".16"/>`,
+      `<circle cx="${x}" cy="${y}" r="${size}" fill="${color}"/>`,
+    )
+    if (room.phase === 'night') {
+      out.push(
+        `<circle cx="${x - 8}" cy="${y - 6}" r="5" fill="#d8d4bd"/><circle cx="${x + 9}" cy="${y + 7}" r="3.5" fill="#d8d4bd"/>`,
+      )
+    }
+  }
+
+  const [cloudColor, cloudOpacity] = room.isRaining
+    ? ['#8e97a8', 0.95]
+    : L.cloud
+  const clouds = room.isRaining ? 6 : 3
+
+  for (let i = 0; i < clouds; i++) {
+    const y = 150 + r() * 110
+    const scale = 0.8 + r() * 0.7
+    const seconds = 110 + r() * 90
+    out.push(
+      `<g transform="translate(${GLASS.x},${n(y)}) scale(${n(scale)})"><g style="animation:drift ${n(seconds)}s ${n(-r() * seconds)}s linear infinite" fill="${cloudColor}" opacity="${cloudOpacity}"><ellipse cx="0" cy="0" rx="46" ry="15"/><ellipse cx="-22" cy="-10" rx="24" ry="15"/><ellipse cx="14" cy="-14" rx="28" ry="18"/></g></g>`,
+    )
+  }
+
+  out.push(
+    `<path d="M512 438V392q70-34 150-12t150-10 140 6 136-18V438Z" fill="${L.hill}"/>`,
+  )
+
+  // The skyline, with windows that light up as it gets dark.
+  let x = GLASS.x - 6
+
+  while (x < GLASS.x + GLASS.w) {
+    const w = 26 + r() * 36
+    const h = 34 + r() * 96
+    const top = 438 - h
+    out.push(rect(x, top, w, h, L.city))
+    if (r() > 0.7) out.push(rect(x + w / 2 - 1, top - 14, 2, 14, L.city))
+    for (let wy = top + 8; wy < 430; wy += 13) {
+      for (let wx = x + 5; wx < x + w - 6; wx += 10) {
+        if (r() > 0.55 && L.lit > 0) {
+          out.push(
+            rect(wx, wy, 4, 6, '#ffd98a', `opacity="${n(L.lit * (0.5 + r() * 0.5))}"`),
+          )
+        }
+      }
+    }
+    x += w + 2 + r() * 8
+  }
+
+  if (room.isRaining) {
+    out.push(rect(GLASS.x, GLASS.y, GLASS.w, GLASS.h, '#56607a', 'opacity=".32"'))
+    for (let i = 0; i < 46; i++) {
+      const rx = GLASS.x + r() * (GLASS.w + 40)
+      const ry = GLASS.y - 100 + r() * GLASS.h
+      out.push(
+        `<line x1="${n(rx)}" y1="${n(ry)}" x2="${n(rx - 5)}" y2="${n(ry + 24)}" stroke="#dfe9ff" stroke-width="1.6" opacity=".55" style="animation:rain ${n(0.5 + r() * 0.4)}s ${n(-r())}s linear infinite"/>`,
+      )
+    }
+  }
+
+  if (isShow) {
+    // By day the sky dims a little so the show reads.
+    if (L.stars < 0.4) {
+      out.push(rect(GLASS.x, GLASS.y, GLASS.w, GLASS.h, '#0b1030', 'opacity=".5"'))
+    }
+    const colors = ['#ff5d73', '#ffd166', '#7ae582', '#6ecbff', '#c9a0ff', '#ff9f5a', '#fff']
+    const spots = [
+      [600, 210],
+      [760, 170],
+      [940, 220],
+      [1030, 175],
+      [680, 265],
+      [860, 245],
+      [565, 165],
+    ]
+
+    spots.forEach(([bx, by], i) => {
+      const color = colors[i % colors.length]
+      const seconds = n(2.4 + r() * 1.2)
+      const delay = n(-r() * 3)
+      const rays = []
+
+      for (let k = 0; k < 14; k++) {
+        const angle = (k / 14) * Math.PI * 2
+        const inner = 10
+        const outer = k % 2 ? 44 : 60
+        rays.push(
+          `<line x1="${n(Math.cos(angle) * inner)}" y1="${n(Math.sin(angle) * inner)}" x2="${n(Math.cos(angle) * outer)}" y2="${n(Math.sin(angle) * outer)}"/>`,
+          `<circle cx="${n(Math.cos(angle) * (outer + 6))}" cy="${n(Math.sin(angle) * (outer + 6))}" r="2.2" fill="${color}" stroke="none"/>`,
+        )
+      }
+      out.push(
+        `<g transform="translate(${bx},${by})"><circle r="2.4" fill="#fff" style="animation:rise ${seconds}s ${delay}s linear infinite"/><circle r="80" fill="${color}" class="c" style="animation:flash ${seconds}s ${delay}s linear infinite" opacity="0"/><g style="animation:glow ${seconds}s ${delay}s linear infinite"><g class="c" stroke="${color}" stroke-width="3" stroke-linecap="round" style="animation:burst ${seconds}s ${delay}s ease-out infinite">${rays.join('')}</g></g></g>`,
+      )
+    })
+  }
+
+  // The sky is not clipped: a cover in the wall's own gradient, with a hole for the glass,
+  // hides what drifts past the frame.
+  const cover = `<path d="M-100 -60H1700V640H-100ZM${GLASS.x} ${GLASS.y}h${GLASS.w}v${GLASS.h}h-${GLASS.w}Z" fill-rule="evenodd" fill="url(#wallOver)"/>`
+
+  return `<g>${out.join('')}${cover}</g>`
+}
+
+function windowFrame(L) {
+  const frame = '#f4eee2'
+  const bulbs = []
+  const colors = ['#ffd166', '#ff7b89', '#7ae582', '#6ecbff']
+
+  for (let i = 0; i < 15; i++) {
+    const t = i / 14
+    const x = 516 + t * 568
+    const y = 112 + Math.sin(t * Math.PI) * 14
+    bulbs.push(
+      `<circle cx="${n(x)}" cy="${n(y)}" r="${L.lamp ? 9 : 0}" fill="${colors[i % 4]}" opacity=".25"/><circle cx="${n(x)}" cy="${n(y)}" r="3.4" fill="${colors[i % 4]}" opacity="${L.lamp ? 1 : 0.55}" ${L.lamp ? `style="animation:tw ${n(1.6 + (i % 5) * 0.4)}s ${n(-i * 0.3)}s infinite"` : ''}/>`,
+    )
+  }
+
+  return [
+    `<path d="M500 110H1100V450H500Z M512 122V438H698V122Z M706 122V438H894V122Z M902 122V438H1088V122Z" fill="${frame}" fill-rule="evenodd"/>`,
+    rect(486, 448, 628, 16, '#e3d8c5', 'rx="3"'),
+    rect(486, 462, 628, 4, '#c9bca6'),
+    rect(452, 90, 696, 6, '#4a3b33', 'rx="3"'),
+    `<path d="M460 96h62q-10 120 2 220t-8 164h-56Z" fill="#c8674f"/><path d="M478 96q-8 190 4 384M500 96q-6 200 6 384" stroke="#a9523d" stroke-width="3" fill="none"/>`,
+    `<path d="M1078 96h62v384h-56q-20-64-8-164t2-220Z" fill="#c8674f"/><path d="M1100 96q6 200-6 384M1122 96q8 190-4 384" stroke="#a9523d" stroke-width="3" fill="none"/>`,
+    `<path d="M516 112Q800 142 1084 112" stroke="#3a322c" stroke-width="1.5" fill="none"/>`,
+    bulbs.join(''),
+  ].join('')
+}
+
+// ------------------------------------------------------------------ room
+
+// The digital clock's three columns: the hour as one two-digit glyph, then the
+// minute's tens and ones. Each column is every glyph it will ever show, stacked
+// in one spot; a glyph is lit for its `slot` seconds out of the column's whole
+// turn, and its delay says how far into that turn it is now. So the clock
+// keeps time by the document's own CSS, with no redraw each minute.
+// Pure, and exported for the tests.
+export function clockColumns(time, format = '24h') {
+  const s = time.s ?? 0
+  const hourLabel = k => String(format === '12h' ? ((k + 11) % 12) + 1 : k).padStart(2, '0')
+  const column = (name, x, slot, labels, elapsed) => {
+    const period = slot * labels.length
+
+    return labels.map((label, k) => {
+      // How far glyph k is into its own turn. JS `%` keeps the sign: wrap it.
+      const into = (((elapsed - k * slot) % period) + period) % period
+
+      return { name, x, label, period, delay: -into, isLit: into < slot }
+    })
+  }
+
+  return [
+    column('clkh', -24, 3600, Array.from({ length: 24 }, (_, k) => hourLabel(k)), time.h * 3600 + time.m * 60 + s),
+    column('clkt', 16, 600, ['0', '1', '2', '3', '4', '5'], time.m * 60 + s),
+    column('clko', 32, 60, ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'], (time.m % 10) * 60 + s),
+  ]
+}
+
+const CLOCK_AT = 'translate(1486,214)'
+
+// The clock's case, on the wall under the room's light.
+function clockCase() {
+  return `<g transform="${CLOCK_AT}"><rect x="-56" y="-28" width="112" height="56" rx="9" fill="#2b2f3a"/><rect x="-50" y="-22" width="100" height="44" rx="5" fill="#10131a"/><rect x="-38" y="28" width="14" height="5" rx="2" fill="#22252e"/><rect x="24" y="28" width="14" height="5" rx="2" fill="#22252e"/></g>`
+}
+
+// Its digits, drawn over the wash so they glow at night as the screens do.
+// A glyph that is not lit carries opacity 0 as an attribute, so a surface that
+// draws the scene still (the mobile app) shows the time it was drawn at.
+function clockFace(time, format) {
+  const glyphs = clockColumns(time, format)
+    .flat()
+    .map(
+      g =>
+        `<text x="${g.x}" y="9" font-size="26" text-anchor="middle"${g.isLit ? '' : ' opacity="0"'} style="animation:${g.name} ${g.period}s ${n(g.delay)}s steps(1) infinite">${g.label}</text>`,
+    )
+    .join('')
+
+  return `<g transform="${CLOCK_AT}" fill="#ffb86b">${glyphs}<text x="0" y="7" font-size="26" text-anchor="middle" style="animation:tw 2s steps(1) infinite">:</text></g>`
+}
+
+function deskWall() {
+  const notes = [
+    [1304, 384, '#ffe27a', -5],
+    [1332, 392, '#ff9db0', 4],
+    [1362, 382, '#9fe0b0', -3],
+    [1390, 394, '#9fd0ff', 6],
+    [1318, 414, '#ffe27a', 3],
+  ]
+
+  return [
+    // A poster.
+    rect(1320, 150, 96, 124, '#2b2f3a', 'rx="4"'),
+    rect(1326, 156, 84, 112, '#1b1e26', 'rx="2"'),
+    `<text x="1368" y="216" font-size="34" text-anchor="middle" fill="#d97757">{ }</text>`,
+    `<text x="1368" y="246" font-size="9" text-anchor="middle" fill="#9aa3b5">hello, world</text>`,
+    // A shelf with books, a cactus and the rubber duck.
+    rect(1300, 350, 232, 8, '#b98a5e', 'rx="2"'),
+    rect(1316, 358, 6, 14, '#8f6843'),
+    rect(1510, 358, 6, 14, '#8f6843'),
+    rect(1312, 300, 12, 50, '#6b7fd1', 'rx="1.5"'),
+    rect(1325, 308, 10, 42, '#e9b44c', 'rx="1.5"'),
+    rect(1336, 296, 14, 54, '#c9596b', 'rx="1.5"'),
+    rect(1351, 312, 9, 38, '#7aa66a', 'rx="1.5"'),
+    `<g transform="rotate(14 1374 350)">${rect(1362, 304, 12, 46, '#e8dfd0', 'rx="1.5"')}</g>`,
+    rect(1420, 330, 26, 20, '#c0694e', 'rx="3"'),
+    `<rect x="1427" y="298" width="12" height="34" rx="6" fill="#3f8f5a"/><rect x="1415" y="310" width="9" height="16" rx="4.5" fill="#3f8f5a"/><rect x="1440" y="306" width="9" height="18" rx="4.5" fill="#3f8f5a"/>`,
+    `<ellipse cx="1492" cy="340" rx="15" ry="10" fill="#ffd23f"/><circle cx="1502" cy="328" r="8" fill="#ffd23f"/><path d="M1509 327l8 3-8 3Z" fill="#f08a24"/><circle cx="1504" cy="326" r="1.4" fill="#2b1d16"/>`,
+    notes
+      .map(
+        ([x, y, color, turn]) =>
+          `<g transform="rotate(${turn} ${x + 11} ${y + 11})">${rect(x, y, 22, 22, color)}<path d="M${x + 4} ${y + 8}h14M${x + 4} ${y + 13}h9" stroke="#2b1d16" stroke-width="1.4" opacity=".45"/></g>`,
+      )
+      .join(''),
+  ].join('')
+}
+
+function lamp(isOn) {
+  return [
+    `<ellipse cx="285" cy="668" rx="24" ry="6" fill="#3a322c"/>`,
+    rect(283, 380, 4, 288, '#3a322c'),
+    `<path d="M258 382h54l-10-46h-34Z" fill="${isOn ? '#ffe9b0' : '#e6d6b0'}"/>`,
+  ].join('')
+}
+
+function floor() {
+  const out = [
+    rect(0, 640, W, 260, '#b98a5e'),
+    rect(0, 628, W, 12, '#f4eee2'),
+    rect(0, 640, W, 3, '#8f6843', 'opacity=".5"'),
+  ]
+
+  for (let y = 684; y < H; y += 44) {
+    out.push(rect(0, y, W, 2, '#8f6843', 'opacity=".28"'))
+  }
+  for (let i = 0; i < 16; i++) {
+    out.push(rect(60 + i * 101, 640 + (i % 5) * 44, 2, 44, '#8f6843', 'opacity=".28"'))
+  }
+  return out.join('')
+}
+
+function couch() {
+  return [
+    rect(316, 660, 12, 18, '#3a322c'),
+    rect(632, 660, 12, 18, '#3a322c'),
+    rect(318, 536, 324, 100, '#3c6877', 'rx="22"'),
+    rect(306, 598, 348, 64, '#4c7d8c', 'rx="16"'),
+    rect(306, 640, 348, 22, '#427080', 'rx="10"'),
+    rect(296, 566, 46, 98, '#5c93a3', 'rx="18"'),
+    rect(618, 566, 46, 98, '#5c93a3', 'rx="18"'),
+    `<g transform="rotate(9 580 580)">${rect(556, 558, 50, 44, '#e9b44c', 'rx="10"')}<path d="M566 568l30 24M596 568l-30 24" stroke="#c9952f" stroke-width="2"/></g>`,
+  ].join('')
+}
+
+function catBed() {
+  return `<ellipse cx="300" cy="756" rx="50" ry="15" fill="#a94f63"/><ellipse cx="300" cy="752" rx="38" ry="9" fill="#d98294"/>`
+}
+
+function plant() {
+  const leaves = [
+    [-38, -46, -40],
+    [-14, -72, -14],
+    [14, -74, 12],
+    [38, -44, 42],
+    [-26, -22, -62],
+    [28, -20, 62],
+  ]
+
+  return `<g transform="translate(1490,780)"><g class="f" style="animation:leaf 8s infinite">${leaves
+    .map(
+      ([x, y, turn], i) =>
+        `<path d="M0 0L${x} ${y}" stroke="#2f6e45" stroke-width="3"/><ellipse cx="${x}" cy="${y}" rx="13" ry="24" fill="${i % 2 ? '#3f8f5a' : '#327a4a'}" transform="rotate(${turn} ${x} ${y})"/>`,
+    )
+    .join('')}</g><path d="M-24 0h48l-6 66h-36Z" fill="#c0694e"/><rect x="-27" y="-4" width="54" height="10" rx="3" fill="#d17d62"/></g>`
+}
+
+function desk() {
+  return [
+    rect(1192, 572, 10, 102, '#8f6843'),
+    rect(1530, 572, 10, 102, '#8f6843'),
+    // The tower under the desk.
+    rect(1460, 590, 54, 84, '#23262e', 'rx="5"'),
+    `<circle cx="1494" cy="646" r="13" fill="#15171c"/><circle cx="1494" cy="646" r="5" fill="#2d3039"/>`,
+    rect(1180, 560, 372, 12, '#b98a5e', 'rx="3"'),
+    rect(1180, 570, 372, 3, '#8f6843', 'opacity=".6"'),
+    // Two monitors: stands and bezels. Screens are drawn above the wash.
+    rect(1350, 516, 10, 38, '#3a3f4b'),
+    rect(1332, 552, 46, 8, '#3a3f4b', 'rx="3"'),
+    rect(1478, 516, 10, 38, '#3a3f4b'),
+    rect(1460, 552, 46, 8, '#3a3f4b', 'rx="3"'),
+    rect(1296, 436, 118, 80, '#1b1e26', 'rx="6"'),
+    rect(1424, 436, 118, 80, '#1b1e26', 'rx="6"'),
+    // Keyboard and mug.
+    rect(1266, 552, 62, 8, '#2d3039', 'rx="2.5"'),
+    `<path d="M1270 555h54" stroke="#6ecbff" stroke-width="1.5" stroke-dasharray="4 2" opacity=".8"/>`,
+    rect(1392, 542, 16, 18, '#f4eee2', 'rx="3"'),
+    `<path d="M1408 546q8 1 0 9" stroke="#f4eee2" stroke-width="3" fill="none"/>`,
+  ].join('')
+}
+
+function chair() {
+  return [
+    rect(1196, 536, 11, 68, '#3a3f4b', 'rx="5.5"'),
+    rect(1200, 598, 76, 11, '#454b59', 'rx="5.5"'),
+    rect(1235, 609, 6, 46, '#2d3039'),
+    `<path d="M1210 668l28-14 28 14" stroke="#2d3039" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="1210" cy="670" r="5" fill="#15171c"/><circle cx="1266" cy="670" r="5" fill="#15171c"/><circle cx="1238" cy="672" r="5" fill="#15171c"/>`,
+  ].join('')
+}
+
+// What the two screens show. Drawn above the wash, since screens glow.
+function screens(mode) {
+  const a = { x: 1301, y: 441 }
+  const b = { x: 1429, y: 441 }
+  const w = 108
+  const h = 70
+  const out = []
+
+  if (mode === 'off') {
+    return rect(a.x, a.y, w, h, '#0c0e13', 'rx="3"') + rect(b.x, b.y, w, h, '#0c0e13', 'rx="3"')
+  }
+  if (mode === 'work') {
+    const r = rng(5)
+    const colors = ['#d97757', '#6ecbff', '#7ae582', '#c9a0ff', '#e8dfd0', '#ffd166']
+    out.push(rect(a.x, a.y, w, h, '#1d2433', 'rx="3"'), rect(b.x, b.y, w, h, '#11161f', 'rx="3"'))
+    for (let i = 0; i < 7; i++) {
+      const indent = Math.floor(r() * 3) * 8
+      const len = 22 + r() * 56
+      out.push(
+        `<rect class="l" x="${a.x + 8 + indent}" y="${a.y + 8 + i * 8.5}" width="${n(Math.min(len, w - 18 - indent))}" height="4" rx="2" fill="${colors[i % colors.length]}" style="animation:type 5s ${n(i * 0.45)}s steps(9) infinite"/>`,
+      )
+    }
+    for (let i = 0; i < 6; i++) {
+      out.push(
+        `<rect class="l" x="${b.x + 8}" y="${b.y + 9 + i * 9}" width="${n(30 + r() * 60)}" height="3.5" rx="1.5" fill="#7ae582" opacity=".85" style="animation:type 3.2s ${n(i * 0.5)}s steps(6) infinite"/>`,
+      )
+    }
+    out.push(
+      `<rect x="${b.x + 8}" y="${b.y + 61}" width="6" height="4" fill="#7ae582" style="animation:tw .9s steps(1) infinite"/>`,
+    )
+
+    return out.join('')
+  }
+  if (mode === 'fail') {
+    return [
+      rect(a.x, a.y, w, h, '#3a1216', 'rx="3"'),
+      rect(b.x, b.y, w, h, '#3a1216', 'rx="3"'),
+      `<g stroke="#ff5d73" stroke-width="7" stroke-linecap="round" style="animation:pulse 1s infinite"><path d="M1337 458l36 36M1373 458l-36 36"/></g>`,
+      `<g fill="#ff5d73" opacity=".85">${[0, 1, 2, 3].map(i => rect(b.x + 8, b.y + 10 + i * 12, 50 + ((i * 23) % 40), 4, '#ff5d73', 'rx="2"')).join('')}</g>`,
+    ].join('')
+  }
+  if (mode === 'pass') {
+    return [
+      rect(a.x, a.y, w, h, '#10301f', 'rx="3"'),
+      rect(b.x, b.y, w, h, '#10301f', 'rx="3"'),
+      `<g stroke="#7ae582" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"><path class="c" style="animation:pop .5s" d="M1335 478l14 14 26-32"/><path class="c" style="animation:pop .5s .2s" d="M1463 478l14 14 26-32"/></g>`,
+    ].join('')
+  }
+
+  // Idle: a screensaver on one, a dim desktop on the other.
+  return [
+    rect(a.x, a.y, w, h, '#161b27', 'rx="3"'),
+    rect(b.x, b.y, w, h, '#1d2433', 'rx="3"'),
+    `<g><g style="animation:saver 14s linear infinite"><rect x="${a.x + 4}" y="${a.y + 4}" width="22" height="16" rx="3" fill="#d97757"/></g></g>`,
+    rect(b.x + 8, b.y + 8, 40, 26, '#2b3550', 'rx="2"'),
+    rect(b.x + 54, b.y + 8, 46, 12, '#2b3550', 'rx="2"'),
+    rect(b.x + 54, b.y + 24, 46, 10, '#2b3550', 'rx="2"'),
+    rect(b.x + 8, b.y + 40, 92, 22, '#2b3550', 'rx="2"'),
+  ].join('')
+}
+
+// ---------------------------------------------------------------- mascot
+
+const ORANGE = '#d97757'
+const ORANGE_DARK = '#c2623f'
+const INK = '#2b1d16'
+
+// The critter, feet at (0, 0): a boxy orange body about 72 wide and 62 tall.
+function critter({ eyes = 'open', look = [0, 0], arms = 'down' }) {
+  const [dx, dy] = look
+  const eyeX = [-17 + dx, 10 + dx]
+  const out = []
+
+  // Legs.
+  for (const x of [-29, -13, 5, 21]) {
+    out.push(rect(x, -14, 8, 14, ORANGE_DARK, 'rx="2"'))
+  }
+  // Back arm.
+  if (arms === 'up') {
+    out.push(
+      `<g class="f" style="animation:sway .5s infinite">${rect(-50, -78, 12, 26, ORANGE, 'rx="4" transform="rotate(-22 -44 -52)"')}</g>`,
+      `<g class="f" style="animation:sway .5s -.25s infinite">${rect(38, -78, 12, 26, ORANGE, 'rx="4" transform="rotate(22 44 -52)"')}</g>`,
+    )
+  } else {
+    out.push(rect(-47, -42, 14, 11, ORANGE, 'rx="3"'))
+    if (arms === 'down' || arms === 'face') out.push(rect(33, -42, 14, 11, ORANGE, 'rx="3"'))
+  }
+  out.push(rect(-36, -62, 72, 52, ORANGE, 'rx="9"'))
+  out.push(rect(-36, -22, 72, 12, ORANGE_DARK, 'rx="6" opacity=".35"'))
+
+  if (eyes === 'open' || eyes === 'wide') {
+    const tall = eyes === 'wide' ? 18 : 13
+    for (const x of eyeX) {
+      out.push(
+        `<rect class="c" x="${x}" y="${-37 - tall + dy}" width="${eyes === 'wide' ? 8 : 7}" height="${tall}" rx="2.5" fill="${INK}" style="animation:blink 5.5s infinite"/>`,
+      )
+    }
+  } else if (eyes === 'half') {
+    for (const x of eyeX) out.push(rect(x, -44 + dy, 7, 6, INK, 'rx="2"'))
+    out.push(rect(-22 + dx, -51 + dy, 46, 7, ORANGE_DARK, 'rx="3" opacity=".55"'))
+  } else if (eyes === 'closed') {
+    for (const x of eyeX) {
+      out.push(
+        `<path d="M${x - 1} ${-43 + dy}q4.5 5 9 0" stroke="${INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,
+      )
+    }
+  } else if (eyes === 'happy') {
+    for (const x of eyeX) {
+      out.push(
+        `<path d="M${x - 1} ${-40 + dy}q4.5-9 9 0" stroke="${INK}" stroke-width="2.8" fill="none" stroke-linecap="round"/>`,
+      )
+    }
+  }
+
+  // Front arm and what it holds.
+  if (arms === 'tapping') {
+    out.push(
+      `<g style="animation:tap .26s infinite">${rect(30, -40, 22, 10, ORANGE, 'rx="4"')}</g>`,
+      `<g style="animation:tap .26s -.13s infinite">${rect(26, -30, 22, 10, ORANGE_DARK, 'rx="4"')}</g>`,
+    )
+  } else if (arms === 'phone') {
+    out.push(
+      `<circle cx="48" cy="-42" r="26" fill="#9fd0ff" opacity=".2" style="animation:pulse 2.2s infinite"/>`,
+      rect(41, -56, 14, 24, '#20242c', 'rx="2.5" transform="rotate(8 48 -44)"'),
+      rect(43, -53, 10, 18, '#9fd0ff', 'rx="1.5" transform="rotate(8 48 -44)"'),
+      `<g style="animation:tap .8s infinite">${rect(30, -38, 16, 10, ORANGE, 'rx="4"')}</g>`,
+    )
+  } else if (arms === 'face') {
+    out.push(rect(-24, -52, 50, 15, ORANGE_DARK, 'rx="6"'))
+  } else if (arms === 'stick') {
+    out.push(
+      rect(33, -48, 16, 10, ORANGE, 'rx="4" transform="rotate(-30 36 -43)"'),
+      `<line x1="44" y1="-48" x2="84" y2="-108" stroke="#8a6a4a" stroke-width="3.5" stroke-linecap="round"/>`,
+      `<g transform="translate(84,-108)"><g class="t" style="animation:sway 1.1s ease-in-out infinite"><line x1="0" y1="0" x2="0" y2="56" stroke="#e8dfd0" stroke-width="1.6"/><circle cx="0" cy="62" r="9" fill="#e85d75"/><path d="M-6 58q6 6 12 0M-5 66q5-5 10 0" stroke="#b83d55" stroke-width="1.4" fill="none"/></g></g>`,
+    )
+  }
+
+  return out.join('')
+}
+
+function zees(x, y, color = '#fff', seconds = 3) {
+  return [0, 1, 2]
+    .map(
+      i =>
+        `<text x="${x}" y="${y}" font-size="${16 + i * 3}" fill="${color}" opacity="0" class="c" style="animation:zz ${seconds}s ${n((i * seconds) / 3)}s infinite">z</text>`,
+    )
+    .join('')
+}
+
+function thought() {
+  return `<g opacity=".95"><circle cx="34" cy="-74" r="3.5" fill="#fff"/><circle cx="42" cy="-86" r="5.5" fill="#fff"/><ellipse cx="66" cy="-112" rx="27" ry="20" fill="#fff"/><g transform="translate(66,-112)"><g class="c" style="animation:flip 2.6s infinite"><path d="M-8-11h16l-8 11 8 11h-16l8-11Z" fill="#d97757" stroke="#2b1d16" stroke-width="1.6" stroke-linejoin="round"/></g></g></g>`
+}
+
+// Which side of the chat a spot is on. Each side is a class, so the
+// stylesheet can pull both inward when a narrow window crops the canvas.
+const side = x => (x < W / 2 ? 'zl' : 'zr')
+
+// Spreads 0..1 over the two side strips, skipping the middle.
+const sideX = u => (u < 0.5 ? u * 2 * 350 : 1240 + (u - 0.5) * 2 * 350)
+
+// Where the mascot is and how it holds itself, for each pose.
+function mascot(room) {
+  const pose = room.mascot
+  const at = (x, y, turn, inner, extra = '', motion = 'breathe 3.8s ease-in-out infinite') =>
+    `<g class="${side(x)}"><g transform="translate(${x},${y})${turn ? ` rotate(${turn})` : ''}"><g class="f" style="animation:${motion}">${inner}</g>${extra}${room.isWaiting && pose !== 'work' ? thought() : ''}</g></g>`
+
+  switch (pose) {
+    case 'phone':
+      return at(172, 622, 0, critter({ look: [5, 4], arms: 'phone' }))
+    case 'scroll': {
+      const hearts = [0, 1, 2]
+        .map(
+          i =>
+            `<path class="c" d="M52-66c-4-7-13-1-7 5l7 6 7-6c6-6-3-12-7-5Z" fill="#ff6b8a" opacity="0" style="animation:zz 2.4s ${n(i * 0.8)}s infinite"/>`,
+        )
+        .join('')
+
+      return at(
+        208,
+        620,
+        -16,
+        critter({ eyes: 'half', look: [6, 2], arms: 'phone' }),
+        hearts,
+        'breathe 5s ease-in-out infinite',
+      )
+    }
+    case 'nap':
+      return at(
+        208,
+        622,
+        -7,
+        critter({ eyes: 'closed', look: [0, 2] }),
+        zees(30, -66),
+        'breathe 4.6s ease-in-out infinite',
+      )
+    case 'sleep':
+      return at(
+        208,
+        622,
+        -7,
+        critter({ eyes: 'closed', look: [0, 2] }) +
+          `<path d="M-26-60h44l18-24Z" fill="#6b7fd1"/><circle cx="36" cy="-85" r="6" fill="#fff"/>` +
+          rect(-44, -36, 90, 38, '#6b7fd1', 'rx="10"') +
+          `<path d="M-44-22h90M-44-10h90" stroke="#8d9ce0" stroke-width="4"/>`,
+        zees(34, -84, '#cfd8ff', 4.5),
+        'breathe 5.5s ease-in-out infinite',
+      )
+    case 'notice':
+      return at(
+        172,
+        622,
+        0,
+        critter({ eyes: 'wide', look: [6, -2] }),
+        `<g transform="translate(0,-74)"><g class="f" style="animation:pop .4s"><rect x="-4" y="-26" width="8" height="18" rx="3" fill="#ffcc33"/><circle cx="0" cy="-2" r="4.5" fill="#ffcc33"/></g></g>`,
+        'hop .8s ease-out 2',
+      )
+    case 'window':
+      return at(110, 308, 0, critter({ look: [7, -5] }), '', 'breathe 4.4s ease-in-out infinite')
+    case 'work':
+      return at(1278, 600, 0, critter({ look: [8, 2], arms: 'tapping' }), '', 'bob .52s infinite')
+    case 'facepalm':
+      return at(
+        1278,
+        600,
+        0,
+        critter({ eyes: 'none', arms: 'face' }),
+        `<path class="c" d="M34-70q-7 11 0 14q7-3 0-14Z" fill="#6ecbff" style="animation:steam 1.8s infinite"/>`,
+        'shake .5s 3',
+      )
+    case 'play':
+      return at(150, 748, 0, critter({ eyes: 'happy', look: [5, 0], arms: 'stick' }))
+    case 'cheer':
+      return at(
+        200,
+        748,
+        0,
+        critter({ eyes: 'happy', arms: 'up' }) +
+          `<path d="M-14-62l14-30 14 30Z" fill="#ffcc33"/><path d="M-9-72h18M-5-80h10" stroke="#e85d75" stroke-width="3"/><circle cx="0" cy="-93" r="4.5" fill="#e85d75"/>`,
+        '',
+        'jump .62s ease-in-out infinite',
+      )
+    default:
+      return at(172, 622, 0, critter({}))
+  }
+}
+
+// ---------------------------------------------------------------- kitten
+
+const FUR = '#8791a6'
+const FUR_DARK = '#69728a'
+const CREAM = '#f4eee2'
+
+function catHead(x, y, { eyes = 'open', isBack = false } = {}) {
+  const out = [
+    `<path d="M${x - 9} ${y - 5}l1-12 8 6ZM${x + 9} ${y - 5}l-1-12-8 6Z" fill="${FUR_DARK}"/>`,
+    `<circle cx="${x}" cy="${y}" r="10.5" fill="${FUR}"/>`,
+  ]
+
+  if (isBack) return out.join('')
+  if (eyes === 'open') {
+    out.push(
+      `<g class="c" style="animation:blink 4.2s infinite"><circle cx="${x - 4}" cy="${y - 1}" r="1.8" fill="#20242c"/><circle cx="${x + 4}" cy="${y - 1}" r="1.8" fill="#20242c"/></g>`,
+    )
+  } else if (eyes === 'wide') {
+    out.push(
+      `<circle cx="${x - 4}" cy="${y - 1}" r="3.4" fill="#fff"/><circle cx="${x + 4}" cy="${y - 1}" r="3.4" fill="#fff"/><circle cx="${x - 4}" cy="${y - 1}" r="1.4" fill="#20242c"/><circle cx="${x + 4}" cy="${y - 1}" r="1.4" fill="#20242c"/>`,
+    )
+  } else {
+    out.push(
+      `<path d="M${x - 6} ${y - 1}q2 2 4 0M${x + 2} ${y - 1}q2 2 4 0" stroke="#20242c" stroke-width="1.4" fill="none" stroke-linecap="round"/>`,
+    )
+  }
+  out.push(
+    `<path d="M${x - 1.5} ${y + 3}h3l-1.5 2Z" fill="#f2a7a7"/><path d="M${x - 14} ${y + 2}l7 1M${x + 14} ${y + 2}l-7 1" stroke="#fff" stroke-width=".8" opacity=".7"/>`,
+  )
+
+  return out.join('')
+}
+
+// Standing, facing right, feet at (0, 0).
+function catStanding({ isWalking = false, isSwiping = false } = {}) {
+  const leg = (x, delay, isFront) =>
+    `<g ${isWalking || (isSwiping && isFront) ? `style="animation:step ${isSwiping ? 0.35 : 0.4}s ${delay}s infinite"` : ''}>${rect(x, -9, 5, 9, isFront ? CREAM : FUR_DARK, 'rx="2"')}</g>`
+
+  return [
+    `<path class="c" d="M-18-17q-14-2-12-22" stroke="${FUR}" stroke-width="5" fill="none" stroke-linecap="round" style="transform-origin:100% 100%;animation:sway 1.5s infinite"/>`,
+    leg(-15, 0, false),
+    leg(-7, -0.2, false),
+    leg(6, -0.1, false),
+    leg(13, -0.3, true),
+    `<ellipse cx="0" cy="-16" rx="20" ry="10" fill="${FUR}"/><ellipse cx="13" cy="-13" rx="6" ry="6" fill="${CREAM}"/>`,
+    catHead(20, -28),
+  ].join('')
+}
+
+// Sitting upright, feet at (0, 0).
+function catSitting({ eyes = 'open', isBack = false, isSpiky = false } = {}) {
+  const tail = isBack
+    ? `<path class="t" d="M2-3q6 16-3 30" stroke="${FUR}" stroke-width="5" fill="none" stroke-linecap="round" style="animation:sway 2.6s ease-in-out infinite"/>`
+    : `<path d="M-9-3q-16 2-14-13" stroke="${FUR}" stroke-width="5" fill="none" stroke-linecap="round"/>`
+  const spikes = isSpiky
+    ? `<path d="M-17-30l6 4-2-9 7 5 1-9 5 7 4-8 2 9 7-4-3 9 7 0-6 6 6 5-8 1 3 8-8-3-1 8-6-6-5 6-2-8-7 3 3-8-8-2 6-5Z" fill="${FUR_DARK}" transform="translate(1,4) scale(1.25)"/>`
+    : ''
+
+  return [
+    tail,
+    spikes,
+    `<ellipse cx="0" cy="-15" rx="12.5" ry="15" fill="${FUR}"/>`,
+    isBack ? '' : `<ellipse cx="0" cy="-16" rx="5.5" ry="9" fill="${CREAM}"/>${rect(-8, -5, 6, 5, CREAM, 'rx="2"')}${rect(2, -5, 6, 5, CREAM, 'rx="2"')}`,
+    `<g class="f" ${eyes === 'open' && !isBack ? 'style="animation:tilt 3.4s ease-in-out infinite"' : ''}>${catHead(0, -36, { eyes, isBack })}</g>`,
+  ].join('')
+}
+
+// A loaf (awake) or a curl (asleep), resting on (0, 0).
+function catLoaf(isAsleep) {
+  return [
+    isAsleep
+      ? `<path d="M-18-6q-8 8 8 7t22-2" stroke="${FUR_DARK}" stroke-width="5" fill="none" stroke-linecap="round"/>`
+      : `<path class="c" d="M-18-8q-12 0-12-14" stroke="${FUR}" stroke-width="5" fill="none" stroke-linecap="round" style="transform-origin:100% 100%;animation:sway 2.2s infinite"/>`,
+    `<g class="f" style="animation:breathe ${isAsleep ? 4.2 : 3.2}s ease-in-out infinite"><ellipse cx="0" cy="-10" rx="21" ry="11" fill="${FUR}"/></g>`,
+    catHead(isAsleep ? 12 : 15, isAsleep ? -10 : -20, { eyes: isAsleep ? 'closed' : 'open' }),
+  ].join('')
+}
+
+function kitten(room) {
+  const pose = room.kitten
+  const at = (x, y, inner, { turn = 0, motion = '', extra = '' } = {}) =>
+    `<g class="${side(x)}"><g transform="translate(${x},${y})${turn ? ` rotate(${turn})` : ''}"><g class="f" ${motion ? `style="animation:${motion}"` : ''}>${inner}</g>${extra}</g></g>`
+
+  switch (pose) {
+    case 'loaf':
+      return at(329, 592, catLoaf(false))
+    case 'sleep':
+      return at(300, 756, catLoaf(true), { extra: zees(22, -24, '#fff', 3.6).replace(/font-size="(\d+)"/g, (_, s) => `font-size="${s - 6}"`) })
+    case 'sill':
+      return at(290, 308, catSitting({ isBack: true }))
+    case 'desk':
+      return at(1522, 560, catSitting({}))
+    case 'startle':
+      return at(290, 308, catSitting({ eyes: 'wide', isSpiky: true }), { motion: 'hop .45s infinite' })
+    case 'yarn':
+      return at(110, 815, catStanding({ isSwiping: true }), {
+        extra: `<g transform="translate(34,-9)"><g class="c" style="animation:roll 1.4s ease-in-out infinite"><circle r="9" fill="#e85d75"/><path d="M-6-3q6 6 12 0M-5 4q5-5 10 0" stroke="#b83d55" stroke-width="1.4" fill="none"/></g></g><path d="M40 0q30 6 60-4" stroke="#e85d75" stroke-width="1.6" fill="none"/>`,
+      })
+    case 'pounce':
+      return at(214, 752, catStanding({ isSwiping: true }), { turn: -30, motion: 'hop .7s infinite' })
+    case 'prowl':
+      return `<g class="zl"><g transform="translate(40,782)"><g style="animation:walk 16s linear infinite"><g class="c" style="animation:face 16s steps(1) infinite">${catStanding({ isWalking: true })}</g></g></g></g>`
+    default:
+      return at(329, 592, catLoaf(false))
+  }
+}
+
+// -------------------------------------------------------------------- fx
+
+function confetti() {
+  const r = rng(99)
+  const colors = ['#ff5d73', '#ffd166', '#7ae582', '#6ecbff', '#c9a0ff', '#d97757']
+  const out = []
+
+  for (let i = 0; i < 70; i++) {
+    const seconds = 2.6 + r() * 2.6
+    out.push(
+      `<g transform="translate(${n(sideX(r()))},0)"><rect class="c" width="${n(6 + r() * 6)}" height="${n(10 + r() * 8)}" rx="1.5" fill="${colors[i % colors.length]}" style="animation:fall ${n(seconds)}s ${n(-r() * seconds)}s linear infinite"/></g>`,
+    )
+  }
+
+  return out.join('')
+}
+
+// ----------------------------------------------------------------- whole
+
+// Moves every inline style="..." into a class in the <style> block. The app
+// draws the scene in a sandboxed frame that keeps the stylesheet; animations
+// named in style attributes did not run there.
+function hoist(svg) {
+  const rules = new Map()
+  const out = svg.replace(
+    /<([a-z]+)((?:\s[^<>]*?)?)\sstyle="([^"]*)"([^<>]*)>/g,
+    (_, tag, before, declarations, after) => {
+      let name = rules.get(declarations)
+
+      if (name === undefined) {
+        name = 's' + rules.size
+        rules.set(declarations, name)
+      }
+      let attributes = before + after
+
+      attributes = /\sclass="/.test(attributes)
+        ? attributes.replace(/\sclass="([^"]*)"/, (__, held) => ` class="${held} ${name}"`)
+        : ` class="${name}"` + attributes
+
+      return `<${tag}${attributes}>`
+    },
+  )
+  const css = [...rules].map(([declarations, name]) => `.${name}{${declarations}}`).join('')
+
+  return out.replace('</style>', css + '</style>')
+}
+
+// Every colour in a piece of the drawing, darkened: what a brightness filter
+// would do, worked out here because a filter stills the scene in the app.
+function shaded(svg, k) {
+  if (k >= 1) return svg
+
+  return svg.replace(/#([0-9a-f]{6}|[0-9a-f]{3})\b/gi, (_, hex) => {
+    const full = hex.length === 3 ? [...hex].map(c => c + c).join('') : hex
+
+    return (
+      '#' +
+      [0, 2, 4]
+        .map(i => Math.round(parseInt(full.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0'))
+        .join('')
+    )
+  })
+}
+
+const OPEN = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">`
+
+// The window, drawn at its own size and set small on the left wall.
+const WIN = { x: -195, y: 92, s: 0.48 }
+const WINDOW = `translate(${WIN.x},${WIN.y}) scale(${WIN.s})`
+// The lamp and couch, drawn further right and larger, set small on the left.
+const LOUNGE = 'translate(-171,149) scale(.78)'
+// The desk and what hangs over it, slid to the right wall.
+const DESK = 'translate(40,0)'
+
+// What the desktop app's backdrop frame cannot take (found by taking the
+// scene apart, 2026-11-15): a CSS `filter`, or an `@media` rule, anywhere in
+// the document stills every animation in it. So the cast is darkened by
+// `shaded`, and nothing moves the two sides inward for a narrow window.
+// A mask and a clip path were tested and are fine, though none is used now.
+//
+// `look` is what the person chose in the plugin's options: `clock` is `24h` or
+// `12h`, `wall` a name in WALLS, `hasKitten` false for a room with no kitten.
+export function buildScene(room, time = { h: 12, m: 0, s: 0 }, look = {}) {
+  const L = LIGHT[room.phase] ?? LIGHT.day
+  const WALL = WALLS[look.wall] ?? WALLS.slate
+  const hasKitten = look.hasKitten !== false
+  const isAsleep = room.mascot === 'sleep'
+  const isLampOn = L.lamp === 1 && !isAsleep
+  const dim = isAsleep ? Math.max(L.dim, 0.62) : L.dim
+  const screenMode =
+    room.mascot === 'work'
+      ? 'work'
+      : room.mascot === 'facepalm'
+        ? 'fail'
+        : room.mascot === 'cheer'
+          ? 'pass'
+          : isAsleep
+            ? 'off'
+            : 'idle'
+  const style = `<style>${CSS}</style>`
+  const cast = `<g>${shaded(mascot(room) + (hasKitten ? kitten(room) : ''), L.chars)}</g>`
+
+  // The wash covers the room but not the window glass.
+  // One path with a hole per pane, where a mask would have been.
+  const panes = PANES.map(
+    ([x, w]) => `M${n(x * WIN.s + WIN.x)} ${n(GLASS.y * WIN.s + WIN.y)}h${n(w * WIN.s)}v${n(GLASS.h * WIN.s)}h-${n(w * WIN.s)}Z`,
+  ).join('')
+  const wash = `<path d="M0 0H${W}V${H}H0Z${panes}" fill-rule="evenodd" fill="${L.tint}" opacity="${dim}"/>`
+  const left = []
+  const right = []
+
+  if (isLampOn) {
+    left.push(
+      `<g transform="${LOUNGE}"><circle cx="285" cy="420" r="300" fill="url(#lampGlow)"/><path d="M258 382h54l-10-46h-34Z" fill="#fff3c9"/></g>`,
+    )
+  }
+  if (L.beam && !room.isRaining) {
+    left.push(`<path d="M60 640H330L360 880H40Z" fill="${L.beam[0]}" opacity="${L.beam[1]}"/>`)
+  }
+  if (dim > 0.2 && screenMode !== 'off') {
+    right.push(`<ellipse cx="1420" cy="490" rx="250" ry="170" fill="url(#screenGlow)"/>`)
+  }
+  const isSteamy = room.mascot === 'work' || room.mascot === 'facepalm'
+  const steam = isSteamy
+    ? [0, 1, 2]
+        .map(
+          i =>
+            `<path d="M${1396 + i * 4} 540q-4-6 0-12" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity="0" style="animation:steam 2.4s ${n(i * 0.8)}s infinite"/>`,
+        )
+        .join('')
+    : ''
+
+  return hoist([
+    OPEN,
+    `<defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${L.sky[0]}"/><stop offset="1" stop-color="${L.sky[1]}"/></linearGradient>`,
+    `<linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${WALL[0]}"/><stop offset="1" stop-color="${WALL[1]}"/></linearGradient>`,
+    `<radialGradient id="lampGlow"><stop offset="0" stop-color="#ffd98a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd98a" stop-opacity="0"/></radialGradient>`,
+    `<radialGradient id="screenGlow"><stop offset="0" stop-color="#8fb8ff" stop-opacity=".34"/><stop offset="1" stop-color="#8fb8ff" stop-opacity="0"/></radialGradient>`,
+    // The wall's gradient again, in the window's own scaled coordinates.
+    `<linearGradient id="wallOver" gradientUnits="userSpaceOnUse" x1="0" y1="${n(-WIN.y / WIN.s)}" x2="0" y2="${n((640 - WIN.y) / WIN.s)}"><stop offset="0" stop-color="${WALL[0]}"/><stop offset="1" stop-color="${WALL[1]}"/></linearGradient></defs>`,
+    style,
+    rect(0, 0, W, 640, 'url(#wall)'),
+    floor(),
+    `<g class="zl"><g transform="${WINDOW}">${outside(room, L)}${windowFrame(L)}</g><g transform="${LOUNGE}">${lamp(isLampOn)}${couch()}</g>${catBed()}</g>`,
+    `<g class="zr"><g transform="${DESK}">${clockCase()}${deskWall()}${desk()}${chair()}${plant()}</g></g>`,
+    wash,
+    `<g class="zl">${left.join('')}</g>`,
+    `<g class="zr"><g transform="${DESK}">${right.join('')}${screens(screenMode)}${clockFace(time, look.clock)}<rect x="1468" y="598" width="6" height="68" rx="3" fill="#ff3d7f" style="animation:pulse 2.4s infinite"/>${steam}</g></g>`,
+    cast,
+    room.fx === 'confetti' ? confetti() : '',
+    '</svg>',
+  ].join(''))
+}

@@ -1,0 +1,11 @@
+# Written by the engine each time it loads the plugin from this folder.
+.claude-plugin/types/
+.mcpb-cache/
+
+# Machine and editor files.
+.DS_Store
+Thumbs.db
+*.log
+*~
+*.swp
+node_modules/

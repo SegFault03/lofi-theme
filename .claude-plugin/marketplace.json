@@ -1,0 +1,14 @@
+{
+  "name": "lofi-theme",
+  "description": "A lofi living room backdrop for the Claude desktop app.",
+  "owner": {
+    "name": "SegFault03"
+  },
+  "plugins": [
+    {
+      "name": "lofi-theme",
+      "source": "./",
+      "description": "A lofi living room behind the chat in the Claude desktop app: the light follows your clock, and an orange mascot and a kitten react to what the session is doing."
+    }
+  ]
+}

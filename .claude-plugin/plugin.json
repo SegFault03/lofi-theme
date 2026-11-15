@@ -1,0 +1,74 @@
+{
+  "name": "lofi-theme",
+  "version": "0.2.0",
+  "description": "A lofi living room behind the chat in the Claude desktop app: the light follows your clock, and an orange mascot and a kitten react to what the session is doing.",
+  "author": {
+    "name": "SegFault03"
+  },
+  "homepage": "https://github.com/SegFault03/lofi-theme",
+  "repository": "https://github.com/SegFault03/lofi-theme",
+  "license": "MIT",
+  "keywords": [
+    "theme",
+    "backdrop",
+    "lofi",
+    "desktop"
+  ],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "clockFormat": {
+      "type": "string",
+      "title": "Clock format",
+      "description": "How the wall clock shows the hour: 24h (17:05) or 12h (05:05).",
+      "default": "24h",
+      "options": [
+        "24h",
+        "12h"
+      ]
+    },
+    "timeOfDay": {
+      "type": "string",
+      "title": "Time of day",
+      "description": "auto lights the room by your clock (dawn, day, golden hour, dusk, night). Name one to keep the room in that light.",
+      "default": "auto",
+      "options": [
+        "auto",
+        "dawn",
+        "day",
+        "golden",
+        "dusk",
+        "night"
+      ]
+    },
+    "wall": {
+      "type": "string",
+      "title": "Wall colour",
+      "description": "The colour of the room's wall.",
+      "default": "slate",
+      "options": [
+        "slate",
+        "plum",
+        "forest",
+        "clay"
+      ]
+    },
+    "kitten": {
+      "type": "boolean",
+      "title": "Kitten",
+      "description": "Off for a room with no kitten in it.",
+      "default": true
+    },
+    "celebrations": {
+      "type": "boolean",
+      "title": "Celebrations",
+      "description": "Confetti on a commit, fireworks on a merged pull request, a cheer or a facepalm on a test run. Off keeps the room calm.",
+      "default": true
+    },
+    "rain": {
+      "type": "boolean",
+      "title": "Rainy days",
+      "description": "About one day in five it rains outside the window. Off keeps the sky clear.",
+      "default": true
+    }
+  }
+}
