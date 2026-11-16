@@ -7,7 +7,10 @@ import type { Room, Screen, Wall } from '../types'
 export type Time = { h: number; m: number; s?: number; ms?: number; now?: number; day?: string }
 
 /** What the person chose in the plugin's options. */
-export type Look = { clock?: '24h' | '12h'; wall?: Wall; hasKitten?: boolean; tv?: Screen }
+/** The colours of the chair and the plant, for a look at others in the preview. */
+export type Tones = { chair: string; seat: string; pot: string; rim: string; leaf: string; leafLight: string; stem: string }
+
+export type Look = { clock?: '24h' | '12h'; wall?: Wall; hasKitten?: boolean; tv?: Screen; tones?: Partial<Tones> }
 
 /** One glyph of the digital clock: lit for its slot of its column's turn. */
 export type ClockGlyph = {

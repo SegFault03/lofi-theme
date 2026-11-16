@@ -46,6 +46,10 @@ function page(query) {
     clock: query.get('clock') ?? '24h',
     wall: query.get('wall') ?? 'slate',
     hasKitten: !query.has('nokitten'),
+    // &before=1 for the chair and the plant as they were in 0.11.4.
+    tones: query.has('before')
+      ? { chair: '#e8245e', seat: '#c4184a', pot: '#a8643a', rim: '#c98450', leaf: '#1f9a4c', leafLight: '#35c46a', stem: '#1c7a3e' }
+      : undefined,
     // &tv=1 for sample figures, &tv=empty for a session with none yet.
     tv: !query.has('tv')
       ? undefined

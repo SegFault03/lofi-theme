@@ -214,6 +214,14 @@ checkpoint in the app before the next.
   beats and the extra shots. The user records the take. Still to do: the
   stills script, the README's top, the release.
 
+- 0.11.5, pushed straight to `main` on the user's word: colours they
+  named for the chair (`#30020c`), the pot (`#421a05`) and the leaves
+  (`#134d08`), kept in `TONES` in `scene.js` with a near shade each for
+  the seat, the rim, every other leaf and the stems. `look.tones`
+  overrides them, and the preview's `&before=1` draws 0.11.4's colours
+  for a look side by side. Seen in the preview: by day they stand out;
+  at night the plant is hard to tell from the wall. 38 tests pass.
+
 Next checkpoints, agreed with the user, in this order:
 1. Done: helpers for subagents.
 2. Done: thinking.

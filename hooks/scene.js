@@ -527,7 +527,19 @@ function catBed() {
   return `<g transform="translate(${BED_X},${DROP})"><ellipse cx="0" cy="756" rx="50" ry="15" fill="#a94f63"/><ellipse cx="0" cy="752" rx="38" ry="9" fill="#d98294"/></g>`
 }
 
-function plant() {
+// The colours of the chair and the plant. `look.tones` may name others: the
+// preview does, to set the last ones beside these.
+const TONES = {
+  chair: '#30020c',
+  seat: '#3f0612',
+  pot: '#421a05',
+  rim: '#57240a',
+  leaf: '#134d08',
+  leafLight: '#1a6410',
+  stem: '#0e3a06',
+}
+
+function plant(t = TONES) {
   const leaves = [
     [-38, -46, -40],
     [-14, -72, -14],
@@ -540,9 +552,9 @@ function plant() {
   return `<g transform="translate(1512,527) scale(.5)"><g class="f" style="animation:leaf 8s infinite">${leaves
     .map(
       ([x, y, turn], i) =>
-        `<path d="M0 0L${x} ${y}" stroke="#1c7a3e" stroke-width="3"/><ellipse cx="${x}" cy="${y}" rx="13" ry="24" fill="${i % 2 ? '#35c46a' : '#1f9a4c'}" transform="rotate(${turn} ${x} ${y})"/>`,
+        `<path d="M0 0L${x} ${y}" stroke="${t.stem}" stroke-width="3"/><ellipse cx="${x}" cy="${y}" rx="13" ry="24" fill="${i % 2 ? t.leafLight : t.leaf}" transform="rotate(${turn} ${x} ${y})"/>`,
     )
-    .join('')}</g><path d="M-24 0h48l-6 66h-36Z" fill="#a8643a"/><rect x="-27" y="-4" width="54" height="10" rx="3" fill="#c98450"/></g>`
+    .join('')}</g><path d="M-24 0h48l-6 66h-36Z" fill="${t.pot}"/><rect x="-27" y="-4" width="54" height="10" rx="3" fill="${t.rim}"/></g>`
 }
 
 // Where the one screen is: its picture, inside the bezel.
@@ -587,10 +599,10 @@ function deskLamp(isOn, isDark) {
   ].join('')
 }
 
-function chair() {
+function chair(t = TONES) {
   return [
-    rect(1196, 536, 11, 68, '#e8245e', 'rx="5.5"'),
-    rect(1200, 598, 76, 11, '#c4184a', 'rx="5.5"'),
+    rect(1196, 536, 11, 68, t.chair, 'rx="5.5"'),
+    rect(1200, 598, 76, 11, t.seat, 'rx="5.5"'),
     rect(1235, 609, 6, 46, '#2d3039'),
     `<path d="M1210 668l28-14 28 14" stroke="#2d3039" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="1210" cy="670" r="5" fill="#15171c"/><circle cx="1266" cy="670" r="5" fill="#15171c"/><circle cx="1238" cy="672" r="5" fill="#15171c"/>`,
   ].join('')
@@ -1399,6 +1411,7 @@ export function buildScene(room, time = { h: 12, m: 0, s: 0 }, look = {}) {
   const L = LIGHT[room.phase] ?? LIGHT.day
   const WALL = WALLS[look.wall] ?? WALLS.slate
   const hasKitten = look.hasKitten !== false
+  const tones = { ...TONES, ...look.tones }
   const isAsleep = room.mascot === 'sleep'
   const isLampOn = L.lamp === 1 && !isAsleep
   const dim = isAsleep ? Math.max(L.dim, 0.62) : L.dim
@@ -1467,7 +1480,7 @@ export function buildScene(room, time = { h: 12, m: 0, s: 0 }, look = {}) {
     `<g class="zl"><g transform="${WINDOW}">${outside(room, L)}${windowFrame(L)}</g></g>`,
     wash,
     // The furniture stands over the wash, in the hour's own light.
-    shaded(`<g class="zl">${rug()}<g transform="${LOUNGE}">${lamp(isLampOn)}${couch()}</g>${airCase()}${catBed()}</g><g class="zr"><g transform="${DESK}">${desk(room.cup)}${plant()}<g transform="translate(42,0)">${chair()}</g></g>${shelf(room.notes)}${clockCase()}${look.tv ? tvCase() : poster()}</g>`, props),
+    shaded(`<g class="zl">${rug()}<g transform="${LOUNGE}">${lamp(isLampOn)}${couch()}</g>${airCase()}${catBed()}</g><g class="zr"><g transform="${DESK}">${desk(room.cup)}${plant(tones)}<g transform="translate(42,0)">${chair(tones)}</g></g>${shelf(room.notes)}${clockCase()}${look.tv ? tvCase() : poster()}</g>`, props),
     `<g class="zl">${left.join('')}</g>`,
     `<g class="zr"><g transform="${DESK}">${right.join('')}${screens(screenMode, room.doing?.kind)}${deskLamp(isSteamy, dim > 0.2)}<rect x="1468" y="598" width="6" height="68" rx="3" fill="#ff3d7f" style="animation:pulse 2.4s infinite"/>${steam}</g>${clockFace(time, look.clock)}${look.tv ? tvFace(look.tv, room.news ? { label: room.news } : room.mascot === 'work' ? room.doing : undefined) : ''}</g>`,
     cast,
