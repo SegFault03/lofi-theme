@@ -266,7 +266,8 @@ checkpoint in the app before the next.
   and `KITTEN_SPOT` only say a pose is known. This replaces what the
   0.6.0 notes below say about the dash. 42 tests pass.
 
-- 0.12.2 (on `care-and-bloom`, not committed): the user saw the mascot
+- 0.12.2 (merged into `main` and pushed, 2026-11-17; the other branches
+  were deleted): the user saw the mascot
   cut, with no fade, from the desk to the couch at a turn's end. The
   fade was timed from the write (`room.at`), so a draw that reached the
   app more than `FADE` after it showed only the new pose. Turn end is when
@@ -280,7 +281,13 @@ checkpoint in the app before the next.
   for a faster fade (first read as longer, then corrected): `FADE` is
   0.5 s (was 0.7), one length for both of the cast. Validate's 8 type warnings on the test file were there before
   (`prompt.edit`, `CommandRunInput` and others); the new test adds none.
-  43 tests pass. The 0.5 s fade not yet seen in the app.
+  43 tests pass. The user saw the 0.5 s fade in the app and approved it.
+
+- 0.12.3 (on `main`): the cheer jumped on the kitten's bowl, on the
+  floor. It now jumps on the couch (`MASCOT_SPOT.cheer`, 190 x
+  622 + DROP; the builder reads its spot from there). Seen in the
+  preview (`&mascot=cheer`); validate passes, 43 tests pass. Not yet seen
+  in the app.
 
 Next checkpoints, agreed with the user, in this order:
 1. Done: helpers for subagents.

@@ -958,9 +958,9 @@ function mascot(room) {
             .join(''),
       )
     case 'cheer':
+      // Jumping on the couch, off the floor where the kitten's bowl is.
       return at(
-        200,
-        748 + DROP,
+        ...MASCOT_SPOT.cheer,
         0,
         critter({ eyes: 'happy', arms: 'up' }) +
           `<path d="M-14-62l14-30 14 30Z" fill="#ffcc33"/><path d="M-9-72h18M-5-80h10" stroke="#e85d75" stroke-width="3"/><circle cx="0" cy="-93" r="4.5" fill="#e85d75"/>`,
@@ -1394,7 +1394,7 @@ const MASCOT_SPOT = {
   work: [1320, 600 + DESK_DROP],
   facepalm: [1320, 600 + DESK_DROP],
   play: [168, 748 + DROP],
-  cheer: [200, 748 + DROP],
+  cheer: [190, 622 + DROP],
   feed: [120, 752 + DROP],
   water: [1474, 580 + DESK_DROP],
 }
