@@ -2,19 +2,24 @@ import { expect, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 
 import {
+  activityOf,
   classify,
+  cupOf,
   dateLabel,
   diffStat,
   folderName,
   greeting,
   KITTEN_POSES,
+  notesOf,
   MASCOT_POSES,
   PHASES,
   phaseAt,
+  prFacts,
   prState,
   resetLabel,
   restPose,
   screenOf,
+  tasksAfter,
 } from './logic.js'
 import { buildScene, clockColumns } from './scene.js'
 
@@ -156,8 +161,8 @@ test('the animated scene keeps to what the desktop app plays', () => {
   // With a filter or a media rule in the document the app draws it all still.
   expect(svg).not.toMatch(/filter|@media/)
   // So the cast is darkened at night colour by colour: the mascot's orange.
-  expect(svg).toContain('#a95d44')
-  expect(buildScene({ phase: 'day', mascot: 'cheer', kitten: 'prowl', fx: 'none', isRaining: false, isWaiting: false })).not.toContain('#a95d44')
+  expect(svg).toContain('#c36b4e')
+  expect(buildScene({ phase: 'day', mascot: 'cheer', kitten: 'prowl', fx: 'none', isRaining: false, isWaiting: false })).not.toContain('#c36b4e')
 })
 
 test('the middle of the room, where the chat sits, stays empty', () => {
@@ -253,7 +258,7 @@ test('with no options set, the room is the default one', async ($, on) => {
   const { alt, source } = await drawn($)
 
   expect(alt).toMatch(/kitten/)
-  expect(source).toContain('#4b5663')
+  expect(source).toContain('#3b4a6b')
   // 24-hour: midnight is among the hour glyphs.
   expect(source).toContain('>00</text>')
 })
@@ -276,8 +281,8 @@ test(
 
     expect(alt).toMatch(/at night.*"work" pose\.$/)
     expect(alt).not.toMatch(/kitten/)
-    expect(source).toContain('#54485f')
-    expect(source).not.toContain('#4b5663')
+    expect(source).toContain('#55407a')
+    expect(source).not.toContain('#3b4a6b')
     // 12-hour: no "00" among the hour glyphs.
     expect(source).not.toContain('>00</text>')
     expect(source).not.toMatch(/animation:rain/)
@@ -290,7 +295,7 @@ test('a wall the build does not know falls back to slate', { options: { wall: 'n
   on('session.start', (_, e) => ({ cwd: e.cwd }))
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
-  expect((await drawn($)).source).toContain('#4b5663')
+  expect((await drawn($)).source).toContain('#3b4a6b')
 })
 
 // ---------------------------------------------------------------- the TV
@@ -544,11 +549,264 @@ test('what is not committed and the pull request are read into a few words', () 
   expect(prState(pr({ state: 'CLOSED' }))).toBe('closed')
   expect(prState('no pull requests found')).toBe(undefined)
   expect(prState('null')).toBe(undefined)
+
+  // The number and the time of the merge come with the word.
+  const merged = Date.UTC(2026, 10, 15, 12, 0)
+
+  expect(prFacts(pr({ number: 16 }))).toEqual({ state: 'open', number: 16, mergedAt: undefined })
+  expect(prFacts(pr({ state: 'MERGED', number: 16, mergedAt: '2026-11-15T12:00:00Z' }))).toEqual({ state: 'merged', number: 16, mergedAt: merged })
+  expect(prFacts('no pull requests found')).toBe(undefined)
+
+  // A merged request keeps its card for a day, and then it goes by itself.
+  const facts = { project: 'p', branch: 'b', pr: 'merged', prNumber: 16, prMergedAt: merged } as const
+  const shown = screenOf(facts, new Date(merged + 23 * 3_600_000))
+
+  expect([shown.pr, shown.prNumber]).toEqual(['merged', 16])
+  const room = { phase: 'day', mascot: 'phone', kitten: 'loaf', fx: 'none', isRaining: false, isWaiting: false } as const
+
+  expect(buildScene(room, undefined, { tv: shown })).toContain('>Merged #16</text>')
+  const gone = screenOf(facts, new Date(merged + 25 * 3_600_000))
+
+  expect([gone.pr, gone.prNumber]).toEqual([undefined, undefined])
+  // An open one stays, however old.
+  expect(screenOf({ ...facts, pr: 'open' }, new Date(merged + 99 * 3_600_000)).pr).toBe('open')
+})
+
+test('a scene drawn again goes on from where its loops were', () => {
+  const room = { phase: 'day', mascot: 'phone', kitten: 'prowl', fx: 'none', isRaining: false, isWaiting: false } as const
+  const at = (s: number, ms = 0) => buildScene(room, { h: 0, m: 0, s, ms })
+
+  // The walk takes 16 s: five seconds in, it starts five seconds in.
+  expect(at(0)).toContain('animation:walk 16s 0s linear infinite')
+  expect(at(5)).toContain('animation:walk 16s -5s linear infinite')
+  expect(at(5)).toContain('animation:face 16s -5s steps(1) infinite')
+  expect(at(21, 500)).toContain('animation:walk 16s -5.5s linear infinite')
+  // A delay the builder wrote is kept: the second leg stays 0.2 s ahead.
+  expect(at(0)).toContain('animation:step 0.4s -0.2s infinite')
+  expect(at(0.1 * 10)).toContain('animation:step 0.4s -0.4s infinite')
+  // The clock's glyphs keep their own delays.
+  expect(buildScene(room, { h: 0, m: 0, s: 5 })).toContain('animation:clko 600s -5s steps(1) infinite')
+  // The kitten turns about its feet: no box whose middle moves with the tail.
+  expect(at(0)).not.toMatch(/class="c[^"]*"[^>]*><ellipse cx="0" cy="-16" rx="20"/)
+})
+
+test('a change of pose is drawn as a move from the old spot', () => {
+  const base = { phase: 'day', fx: 'none', isRaining: false, isWaiting: false } as const
+  const room = { ...base, mascot: 'work', kitten: 'loaf', was: { mascot: 'phone', kitten: 'loaf' }, at: 1_000_000 } as const
+  const at = (ms: number) => buildScene(room, { h: 12, m: 0, s: 0, now: 1_000_000 + ms })
+  const plain = buildScene({ ...base, mascot: 'work', kitten: 'loaf' }, { h: 12, m: 0, s: 0 })
+
+  // At once: the old pose fades where it stood, the new one dashes from there.
+  expect(at(0)).toContain('@keyframes mdash{0%,12%{transform:translate(-1148px,-10px)}100%{transform:translate(0px,0px)}}')
+  expect(at(0)).toContain('animation:mdash 1s 0s ease-out')
+  expect(at(0)).toContain('animation:gone 0.3s 0s linear')
+  // The old pose is unseen without the animation, for a surface that draws still.
+  expect(at(0)).toMatch(/<g class="s\d+" opacity="0"><g class="zl">/)
+  // The kitten kept its pose: it does not move.
+  expect(at(0)).not.toContain('kdash')
+  // Drawn again half a second in, the dash goes on; the fade is over.
+  expect(at(500)).toContain('animation:mdash 1s -0.5s ease-out')
+  expect(at(500)).not.toContain('animation:gone')
+  // After the move, and with no clock or no old pose, the room as it is.
+  expect(at(1500)).toBe(plain)
+  expect(buildScene(room, { h: 12, m: 0, s: 0 })).toBe(plain)
+
+  // Two poses on one spot only fade into each other.
+  const nap = buildScene({ ...base, mascot: 'sleep', kitten: 'sleep', was: { mascot: 'nap', kitten: 'loaf' }, at: 0 }, { h: 12, m: 0, s: 0, now: 100 })
+
+  expect(nap).not.toContain('mdash')
+  expect(nap).toContain('animation:show 0.3s -0.1s linear')
+  // The kitten never dashes: it fades out on the couch and in on its bed.
+  expect(nap).not.toContain('kdash')
+  expect(nap.match(/animation:gone 0\.3s -0\.1s linear/g)?.length).toBe(1)
+  expect(nap).toContain(`translate(300,816)`)
+  // No fill mode, and no inline style, in any of it.
+  expect(at(0)).not.toMatch(/\sstyle="|forwards|backwards|both/)
+})
+
+test('the session stores the pose it leaves, once per change', async ($, on) => {
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('classic.UserPromptSubmit', () => ({}))
+
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  await $.classic.UserPromptSubmit({ prompt: 'go' })
+  // The mascot is on its way to the desk.
+  expect((await drawn($)).source).toContain('@keyframes mdash')
+})
+
+test('a tool call is read for what the desk shows', () => {
+  expect(activityOf('Read', { file_path: 'F:\\code\\app\\hooks\\scene.js' })).toEqual({ kind: 'read', label: 'reading scene.js' })
+  expect(activityOf('Grep', { pattern: 'secret', path: '/work/app' })).toEqual({ kind: 'read', label: 'searching' })
+  expect(activityOf('Edit', { file_path: '/work/app/a-very-long-file-name-indeed.test.tsx' })).toEqual({ kind: 'edit', label: 'editing a-very-long-file-na…' })
+  // A command shows its first word only: no argument, no path.
+  expect(activityOf('Bash', { command: '/usr/bin/git commit -m "a secret"' })).toEqual({ kind: 'shell', label: 'running git' })
+  expect(activityOf('PowerShell', { command: '' })).toEqual({ kind: 'shell', label: 'running a command' })
+  expect(activityOf('WebSearch', { query: 'x' })).toEqual({ kind: 'web', label: 'searching the web' })
+  expect(activityOf('mcp__Claude_Browser__navigate', { url: 'https://example.com' })).toEqual({ kind: 'web', label: 'browsing' })
+  expect(activityOf('AskUserQuestion', {})).toBe(undefined)
+})
+
+test('the monitor, the mascot and the ticker show the tool in hand', () => {
+  const base = { phase: 'day', mascot: 'work', kitten: 'loaf', fx: 'none', isRaining: false, isWaiting: false } as const
+  const tv = { project: 'p', chat: 'c', feed: ['turn 3'] }
+  const draw = (kind?: 'read' | 'edit' | 'shell' | 'web') =>
+    buildScene(kind ? { ...base, doing: { kind, label: `${kind} <b>` } } : base, { h: 12, m: 0, s: 0 }, { tv })
+
+  // An edit is the typing there always was; each other kind has its own screen.
+  expect(draw('edit')).toContain('animation:type 5s')
+  expect(draw('read')).toContain('animation:scan 3.2s')
+  expect(draw('shell')).toContain('fill="#0b0d10"')
+  expect(draw('web')).toContain('fill="#e9edf3"')
+  // The words lead the ticker, escaped.
+  expect(draw('read')).toContain('read &#60;b&#62;  ·  turn 3')
+  expect(draw()).not.toContain('  ·  turn 3')
+  // Away from the desk nothing of it shows.
+  const away = buildScene({ ...base, mascot: 'phone', doing: { kind: 'shell', label: 'running git' } }, { h: 12, m: 0, s: 0 }, { tv })
+
+  expect(away).not.toContain('running git')
+  expect(away).not.toContain('fill="#0b0d10"')
+  for (const kind of ['read', 'edit', 'shell', 'web'] as const) {
+    expect(draw(kind)).not.toMatch(/\sstyle="|filter|@media/)
+    expect(draw(kind).length).toBeLessThan(131_072)
+  }
+})
+
+test('typing between turns perks the mascot up; a tool in hand reaches the desk', async ($, on) => {
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('prompt.edit', (_, e) => ({ text: e.text + e.inputText, cursor: e.cursor + e.inputText.length }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('tool.call', () => ({ result: {} }))
+
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  await $.prompt.edit({ origin: { kind: 'user' }, text: '', cursor: 0, start: 0, end: 0, inputText: 'h' })
+  // The exclamation mark of the notice pose pops up.
+  expect((await drawn($)).source).toContain('animation:pop .4s')
+
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  // No tool in hand yet: it thinks, at a dim screen.
+  const thinking = (await drawn($)).source
+
+  expect(thinking).toContain('>thinking')
+  expect(thinking).toContain('fill="#141925"')
+  expect(thinking).not.toContain('animation:type 5s')
+  await $.tool.call({ tool: 'Read', file_path: '/work/my-project/scene.js' })
+  const { source } = await drawn($)
+
+  expect(source).toContain('animation:scan 3.2s')
+  expect(source).toContain('reading scene.js')
+})
+
+test('/room log lists the redraws, and two changes at once are one redraw each', async ($, on) => {
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('tool.call', () => ({ result: {} }))
+  const log = async () =>
+    ((await $.command.run({ command: 'room', args: 'log', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })) as { text: string }).text
+
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  const before = (await log()).split('\n').length
+
+  // The tool's start and its end both ask for the room: it is drawn once.
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  const after = await log()
+
+  expect(after).toMatch(/^\d+ redraws in the last minute/)
+  expect(after).toContain('room: work, kitten ')
+  expect(after.split('\n').length - before).toBe(1)
+  expect(after.split('\n').pop()).toContain(', shell')
+})
+
+test('each subagent at work has a helper by the desk, three at most', async ($, on) => {
+  const room = { phase: 'day', mascot: 'phone', kitten: 'loaf', fx: 'none', isRaining: false, isWaiting: false } as const
+  const lids = (svg: string) => svg.match(/scale\(\.65\)/g)?.length ?? 0
+
+  expect(lids(buildScene(room))).toBe(0)
+  expect(lids(buildScene({ ...room, helpers: 2 }))).toBe(2)
+  expect(lids(buildScene({ ...room, helpers: 9 }))).toBe(3)
+  // On the right side, clear of the chat.
+  expect(buildScene({ ...room, helpers: 3 })).toContain('translate(1424,856) scale(.65)')
+
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', () => ({ text: 'done' }))
+
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'look around', turnId: 'a1', agentId: 'agent-1' })
+  await $.turn.start({ text: 'look elsewhere', turnId: 'a2', agentId: 'agent-2' })
+  await $.turn.start({ text: 'main', turnId: 't1' })
+  expect(lids((await drawn($)).source)).toBe(2)
+
+  await $.turn.complete({ turnId: 'a1', agentId: 'agent-1', reason: 'answer', isAborted: false, answer: 'done', durationMs: 1000 })
+  await $.turn.start({ text: 'main again', turnId: 't2' })
+  expect(lids((await drawn($)).source)).toBe(1)
+})
+
+test('the ticker says what the moment is, and a failed call shows on the desk', async ($, on) => {
+  let isFailing = false
+
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('tool.call', () => (isFailing ? { result: {}, isError: true } : { result: {} }))
+
+  expect(classify('gh pr create --fill')).toBe('pr')
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'go', turnId: 't1' })
+
+  await $.tool.call({ tool: 'Bash', command: 'npm test' })
+  expect((await drawn($)).source).toContain('>Tests passed')
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m "x"' })
+  expect((await drawn($)).source).toContain('>Committed')
+  await $.tool.call({ tool: 'Bash', command: 'gh pr create --fill' })
+  expect((await drawn($)).source).toContain('>Pull request opened')
+  await $.tool.call({ tool: 'Bash', command: 'gh pr merge 7' })
+  expect((await drawn($)).source).toContain('>Pull request merged!')
+  isFailing = true
+  await $.tool.call({ tool: 'Bash', command: 'npm test' })
+  expect((await drawn($)).source).toContain('>Tests failed')
+
+  // The words stand alone in the scene too.
+  const room = { phase: 'day', mascot: 'work', kitten: 'loaf', fx: 'none', isRaining: false, isWaiting: false } as const
+  const failed = buildScene({ ...room, doing: { kind: 'error', label: 'Read failed' } }, undefined, { tv: { project: 'p', chat: 'c', feed: [] } })
+
+  expect(failed).toContain('>Read failed')
+  expect(failed).toContain('fill="#2a1418"')
+})
+
+test('the project follows the session to another folder', async ($, on) => {
+  let folder = '/tmp/spare-3ASnlA'
+
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('session.cwd', () => ({ value: folder }))
+  on('classic.UserPromptSubmit', () => ({}))
+
+  await $.session.start({ cwd: folder, surface: 'desktop', isInteractive: true })
+  expect((await drawn($)).source).toContain('spare-3ASnlA')
+
+  // The app started the session in a spare folder and then moved it.
+  folder = '/work/my-project'
+  await $.classic.UserPromptSubmit({ prompt: 'go on' })
+  const { source } = await drawn($)
+
+  expect(source).toContain('my-project')
+  expect(source).not.toContain('spare-3ASnlA')
 })
 
 test('the diff and the pull request stand beside the branch, and go with it', async ($, on) => {
   let branch = 'main'
-  let pull = JSON.stringify({ state: 'OPEN', isDraft: false, reviewDecision: '', statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'FAILURE' }] })
+  let pull = JSON.stringify({ number: 16, state: 'OPEN', isDraft: false, reviewDecision: '', statusCheckRollup: [{ status: 'COMPLETED', conclusion: 'FAILURE' }] })
   const out = (stdout: string, exitCode = 0) => ({ value: { exitCode, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } })
 
   on('command.register', () => ({ value: { command: 'room' } }))
@@ -571,7 +829,7 @@ test('the diff and the pull request stand beside the branch, and go with it', as
   expect(source).toContain('>/</tspan>')
   expect(source).toContain('>-32</tspan>')
   // The card: an Open label, and the checks beside it.
-  expect(source).toContain('>Open</text>')
+  expect(source).toContain('>Open #16</text>')
   expect(source).toContain('>checks failing</text>')
   // Failing checks: the red disc.
   expect(source).toContain('<circle r="4.5" fill="#ff5d6c"/>')
@@ -584,5 +842,78 @@ test('the diff and the pull request stand beside the branch, and go with it', as
   source = (await drawn($)).source
   expect(source).toContain('>throwaway</text>')
   expect(source).not.toContain('<circle r="4.5" fill="#ff5d6c"/>')
-  expect(source).not.toContain('>Open</text>')
+  expect(source).not.toContain('>Open #16</text>')
+})
+
+test('the task list is read from the calls that write it', () => {
+  // A whole list, from either tool that sends one.
+  const plan = tasksAfter([], 'mcp__ccd_turn__update_plan', { items: [{ content: 'a secret', status: 'in_progress' }, { content: 'b', status: 'pending' }, { content: 'c', status: 'pending' }] })
+
+  expect(notesOf(plan)).toBe('app')
+  expect(JSON.stringify(plan)).not.toContain('secret')
+  expect(notesOf(tasksAfter(plan, 'mcp__ccd_turn__update_plan', { advance: true }))).toBe('dap')
+  expect(notesOf(tasksAfter(plan, 'mcp__ccd_turn__update_plan', { done: [1], start: 3 }))).toBe('dpa')
+  expect(notesOf(tasksAfter(plan, 'mcp__ccd_turn__wrap_up', { recap: 'x' }))).toBe('ddd')
+  expect(notesOf(tasksAfter(plan, 'TodoWrite', { todos: [{ content: 'x', status: 'completed', activeForm: 'x' }] }))).toBe('d')
+  // One task at a time, by the id the answer gives.
+  let list = tasksAfter([], 'TaskCreate', { subject: 'x' }, { task: { id: '7', subject: 'x' } })
+
+  list = tasksAfter(list, 'TaskCreate', { subject: 'y' }, { task: { id: '8', subject: 'y' } })
+  list = tasksAfter(list, 'TaskUpdate', { taskId: '8', status: 'in_progress' })
+  expect(notesOf(list)).toBe('pa')
+  expect(notesOf(tasksAfter(list, 'TaskUpdate', { taskId: '7', status: 'deleted' }))).toBe('a')
+  // Any other call leaves the list as it is; none is no notes.
+  expect(tasksAfter(list, 'Read', { file_path: 'x' })).toBe(list)
+  expect(notesOf([])).toBe(undefined)
+  // A long list shows the eight around the one in hand.
+  const long = [...'ddddddddapppp'].map(mark => ({ mark }) as { mark: 'p' | 'a' | 'd' })
+
+  expect(notesOf(long)).toBe('dddapppp')
+  // The mug: full with a fresh context, empty when it is nearly gone.
+  expect([0, 19, 20, 55, 81, 100, 140].map(cupOf)).toEqual([4, 4, 3, 2, 0, 0, 0])
+  expect(cupOf(undefined)).toBe(undefined)
+})
+
+test('the notes and the mug are drawn from the room, on the right side', () => {
+  const base = { phase: 'day', mascot: 'work', kitten: 'loaf', fx: 'none', isRaining: false, isWaiting: false } as const
+  const at = { h: 12, m: 0, s: 0 }
+  const plain = buildScene(base, at)
+  const busy = buildScene({ ...base, notes: 'ddappppp', cup: 2 }, at)
+
+  // Two ticks, one note in hand that flutters, coffee half way down.
+  expect(busy.split('stroke="#1f7a3d"').length).toBe(3)
+  expect(busy.split('animation:shake 1.2s').length).toBe(2)
+  expect(plain).not.toContain('stroke="#1f7a3d"')
+  expect(busy).toContain('height="9" fill="#6b4226"')
+  expect(plain).toContain('height="18" fill="#6b4226"')
+  // An empty mug holds nothing and does not steam.
+  const dry = buildScene({ ...base, cup: 0 }, at)
+
+  expect(dry).not.toContain('fill="#6b4226"')
+  expect(dry).not.toContain('animation:steam')
+  expect(busy).toContain('animation:steam')
+  expect(busy).not.toMatch(/\sstyle="|filter|@media/)
+  expect(busy.length).toBeLessThan(131_072)
+})
+
+test('a plan and the context reach the shelf and the mug', async ($, on) => {
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.complete', () => ({}))
+  on('tool.call', () => ({ result: {} }))
+  on('session.measure', (_, e) => ({ changed: e.changed }))
+
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'go', turnId: 't1' })
+  await $.tool.call({ tool: 'TodoWrite', todos: [{ content: 'a', status: 'completed', activeForm: 'a' }, { content: 'b', status: 'in_progress', activeForm: 'b' }] })
+  await $.session.measure({ context: { window: 200_000, tokens: 130_000, percent: 65 }, rateLimits: [], changed: ['context'] })
+  const { source } = await drawn($)
+
+  // By the tick's shape: its colour follows the hour.
+  expect(source.split('l4 4 8-9').length).toBe(2)
+  expect(source).toContain('animation:shake 1.2s')
+  // 65% used: one part of four is left in the mug.
+  expect(source).toMatch(/width="14" height="4\.5" fill="#/)
 })

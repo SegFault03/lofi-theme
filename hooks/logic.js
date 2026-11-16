@@ -66,23 +66,137 @@ export function kittenPose(phase, r) {
 }
 
 const MERGE = /\bgh\s+pr\s+merge\b/
+const OPENED = /\bgh\s+pr\s+create\b/
 const COMMIT = /\bgit\s+(-\S+\s+\S+\s+)*commit\b/
 const TEST =
   /\b((npm|pnpm|yarn|bun)\s+(run\s+)?test|npx\s+(jest|vitest|playwright)|pytest|jest|vitest|cargo\s+test|go\s+test|dotnet\s+test|mvn\s+test|gradlew?(\.bat)?\s+\S*test|claude\s+plugin\s+test)\b/i
 
-/** What a shell command means to the room: `merge`, `commit`, `test` or null. */
+/** What a shell command means to the room: `merge`, `commit`, `pr` (one opened), `test` or null. */
 export function classify(command) {
   if (typeof command !== 'string') return null
   // Commit first: a commit message may mention a merge.
   if (COMMIT.test(command)) return 'commit'
   if (MERGE.test(command)) return 'merge'
+  if (OPENED.test(command)) return 'pr'
   if (TEST.test(command)) return 'test'
   return null
+}
+
+const READS = ['Read', 'Grep', 'Glob', 'LS', 'NotebookRead', 'ToolSearch']
+const EDITS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit']
+const SHELLS = ['Bash', 'PowerShell']
+const short = (text, most = 28) => {
+  const all = [...String(text ?? '').replace(/\s+/g, ' ').trim()]
+
+  return all.length > most ? all.slice(0, most - 1).join('') + '…' : all.join('')
+}
+
+/**
+ * What a tool call is, for the desk: one of `read`, `edit`, `shell`, `web`,
+ * and a few words for the ticker. Only a file's own name and a command's
+ * first word are shown, never a path or an argument. Undefined for a tool
+ * that is none of these.
+ */
+export function activityOf(tool, input = {}) {
+  const name = String(tool ?? '')
+  const file = folderName(input?.file_path ?? input?.notebook_path ?? input?.path)
+
+  if (EDITS.includes(name)) return { kind: 'edit', label: short(file ? `editing ${file}` : 'editing') }
+  if (READS.includes(name)) {
+    return { kind: 'read', label: short(name === 'Read' && file ? `reading ${file}` : name === 'Read' ? 'reading' : 'searching') }
+  }
+  if (SHELLS.includes(name)) {
+    const word = folderName(String(input?.command ?? '').trim().split(/\s+/)[0]).replace(/[^\w.-]/g, '')
+
+    return { kind: 'shell', label: short(word ? `running ${word}` : 'running a command') }
+  }
+  if (/^Web(Fetch|Search)$|browser|chrome|computer/i.test(name)) {
+    return { kind: 'web', label: name === 'WebSearch' ? 'searching the web' : 'browsing' }
+  }
+
+  return undefined
 }
 
 /** About one day in five it rains, the same all day. */
 export function isRainyDay(dayNumber) {
   return (Math.imul(dayNumber | 0, 2654435761) >>> 0) % 5 === 0
+}
+
+// ---------------------------------------------------------------- the tasks
+
+const MARK = { pending: 'p', in_progress: 'a', completed: 'd' }
+
+/** The most notes the shelf has room for. */
+export const MOST_NOTES = 8
+
+/**
+ * The task list after a tool call, or the same list where the call is not
+ * about tasks. Each task is `{ id?, mark }`: `p` pending, `a` in hand, `d`
+ * done. No task's words are kept. `result` is the call's own answer, which
+ * holds a new task's id.
+ */
+export function tasksAfter(tasks, tool, input = {}, result = undefined) {
+  const name = String(tool ?? '')
+  const whole = list => (Array.isArray(list) ? list.map(each => ({ mark: MARK[each?.status] ?? 'p' })) : tasks)
+
+  if (name === 'TodoWrite') return whole(input?.todos)
+  if (name === 'TaskCreate') {
+    const id = result?.task?.id
+
+    return [...tasks, { id: id === undefined ? undefined : String(id), mark: 'p' }]
+  }
+  if (name === 'TaskUpdate') {
+    const id = String(input?.taskId ?? '')
+
+    if (input?.status === 'deleted') return tasks.filter(each => each.id !== id)
+    const mark = MARK[input?.status]
+
+    return mark === undefined ? tasks : tasks.map(each => (each.id === id ? { ...each, mark } : each))
+  }
+  // The desktop app's own list: a whole plan, or a step forward in it.
+  if (/update_plan$/.test(name)) {
+    if (Array.isArray(input?.items)) return whole(input.items)
+    let next = tasks.map(each => ({ ...each }))
+
+    if (input?.advance === true) {
+      const at = next.findIndex(each => each.mark === 'a')
+
+      if (at >= 0) next[at].mark = 'd'
+      const then = next.findIndex(each => each.mark === 'p')
+
+      if (then >= 0) next[then].mark = 'a'
+    }
+    for (const step of Array.isArray(input?.done) ? input.done : []) {
+      if (next[step - 1]) next[step - 1].mark = 'd'
+    }
+    if (next[input?.start - 1]) next[input.start - 1].mark = 'a'
+
+    return next
+  }
+  // Wrapping a turn up checks the rest of the list off.
+  if (/__wrap_up$/.test(name)) return tasks.map(each => ({ ...each, mark: 'd' }))
+
+  return tasks
+}
+
+/**
+ * The list as the shelf's notes: one letter a task, MOST_NOTES at most,
+ * the stretch that holds the one in hand. Undefined for no list.
+ */
+export function notesOf(tasks) {
+  if (tasks.length === 0) return undefined
+  const marks = tasks.map(each => each.mark).join('')
+  const hand = Math.max(0, marks.indexOf('a') < 0 ? marks.indexOf('p') : marks.indexOf('a'))
+  const from = Math.max(0, Math.min(hand - 3, marks.length - MOST_NOTES))
+
+  return marks.slice(from, from + MOST_NOTES)
+}
+
+/** How much coffee is left in the mug, 4 (full) to 0, as the context fills. */
+export function cupOf(percent) {
+  if (typeof percent !== 'number' || !Number.isFinite(percent)) return undefined
+
+  return 4 - Math.max(0, Math.min(4, Math.floor(percent / 20)))
 }
 
 // ---------------------------------------------------------------- the TV
@@ -174,6 +288,28 @@ export function prState(json) {
   return checks.length > 0 ? 'passing' : 'open'
 }
 
+/** How long a merged request keeps its card: a day from the merge. */
+export const MERGED_SHOWN_MS = 24 * 3_600_000
+
+/**
+ * The pull request as the TV needs it, from what
+ * `gh pr view --json number,mergedAt,state,...` prints: its word, its number
+ * and when it was merged (ms), each where the reading has one.
+ */
+export function prFacts(json) {
+  const state = prState(json)
+
+  if (state === undefined) return undefined
+  const pr = JSON.parse(String(json))
+  const mergedAt = new Date(pr.mergedAt ?? NaN).getTime()
+
+  return {
+    state,
+    number: Number.isInteger(pr.number) && pr.number > 0 ? pr.number : undefined,
+    mergedAt: Number.isNaN(mergedAt) ? undefined : mergedAt,
+  }
+}
+
 /**
  * What the TV shows, from the session's facts. Every figure is rounded, so
  * the screen (and with it the whole scene) is redrawn only when one moves by
@@ -197,6 +333,10 @@ export function screenOf(facts, now = new Date()) {
   if (quota('five_hour')?.percent > 80) feed.push('Low on 5h usage!')
   if (quota('seven_day')?.percent > 80) feed.push('Low on weekly usage!')
   if (Math.round(context?.percent ?? 0) > 80) feed.push('Context limit reaching soon!')
+  // A merged request is old news after a day: its card goes by itself.
+  const isOldMerge =
+    facts.pr === 'merged' && facts.prMergedAt !== undefined && now.getTime() - facts.prMergedAt > MERGED_SHOWN_MS
+  const hasPr = Boolean(facts.project && facts.branch && facts.pr) && !isOldMerge
 
   return {
     project: facts.project ?? '',
@@ -204,7 +344,8 @@ export function screenOf(facts, now = new Date()) {
     branch: facts.project && facts.branch ? facts.branch : undefined,
     // Both belong to the branch: no branch line, neither.
     diff: facts.project && facts.branch ? facts.diff : undefined,
-    pr: facts.project && facts.branch ? facts.pr : undefined,
+    pr: hasPr ? facts.pr : undefined,
+    prNumber: hasPr ? facts.prNumber : undefined,
     // Shown in place of a name that is not known yet.
     greeting: facts.project && facts.chat ? undefined : greeting(now.getHours(), facts.user),
     fiveHour: quota('five_hour'),

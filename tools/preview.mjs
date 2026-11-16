@@ -22,11 +22,24 @@ function page(query) {
     fx: query.get('fx') ?? 'none',
     isRaining: query.has('rain'),
     isWaiting: query.has('waiting'),
+    // &doing=read (edit, shell, web) for the tool in hand, with &mascot=work.
+    doing: query.has('doing') ? { kind: query.get('doing'), label: query.get('label') ?? `${query.get('doing')} scene.js` } : undefined,
+    // &helpers=2 for subagents at work.
+    helpers: number('helpers', 0),
+    // &notes=ddappp for a task list (done, in hand, pending); &cup=2 for a half-drunk mug.
+    notes: query.get('notes') ?? undefined,
+    cup: query.has('cup') ? number('cup', 4) : undefined,
+    // &from=phone,loaf for the poses it just left: each load plays the move.
+    // &since=0.5 for a drawing that many seconds into it.
+    was: query.has('from') ? { mascot: query.get('from').split(',')[0], kitten: query.get('from').split(',')[1] ?? (query.get('kitten') ?? 'loaf') } : undefined,
+    at: now.getTime() - number('since', 0) * 1000,
   }
   const time = {
     h: number('h', now.getHours()),
     m: number('m', now.getMinutes()),
     s: number('s', now.getSeconds()),
+    ms: now.getMilliseconds(),
+    now: now.getTime(),
     day: dateLabel(now),
   }
   const look = {
@@ -45,6 +58,8 @@ function page(query) {
             // &diff=133,32 and &pr=failing (or any state) for the branch line.
             diff: query.has('diff') ? { added: Number(query.get('diff').split(',')[0]), removed: Number(query.get('diff').split(',')[1] ?? 0) } : undefined,
             pr: query.get('pr') ?? undefined,
+            // &prn=16 for its number.
+            prNumber: query.has('prn') ? Number(query.get('prn')) : undefined,
             fiveHour: { percent: number('p5', 42), resets: '14:30' },
             week: { percent: number('pw', 18), resets: 'Tue 09:00' },
             context: { percent: number('ctx', 37), tokens: number('ctx', 37) * 2000, window: 200000 },

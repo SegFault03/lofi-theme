@@ -13,6 +13,268 @@ refuses it). Earlier rounds call it `living-room`, which is
 still the backdrop's scene id. Work here; the copies in the per-session
 dev-mods folders are gone.
 
+**Project name, PR number, merged card's day: version 0.5.3 (2026-11-16; not committed)**
+
+- Project name was wrong for good (`spare-3ASnlA`): the desktop app starts
+  a session in a spare folder and moves it to the project afterwards, and
+  `F.project` was read once, at `session.start`. `scout` now reads it each
+  time (`$.session.repo().root`, then `$.session.cwd()`), so it follows at
+  the next prompt, turn end or git command; a new `classic.CwdChanged` hook
+  does the same at once. Not yet seen in the app.
+- PR card shows the number (`Open #16`, `Merged #16`): `Screen.prNumber`
+  (shape `tv-3`, so the stored screen is dropped once and the chat's name
+  comes back with the next prompt). `prFacts` in `logic.js` reads
+  `number` and `mergedAt` with the state. Where the number leaves the note
+  no room (past x 234) the note is cut to its first word (`changes`).
+- A merged card goes 24 h after the merge (`MERGED_SHOWN_MS`, from
+  `mergedAt`, decided in `screenOf`). The minute tick airs the screen while
+  the request is merged, so it goes without a prompt. Closed cards stay.
+- Preview: `&prn=16`. The preview server must be restarted to see a change
+  to `scene.js`.
+- Checked: validate passes (same two warnings), 26 tests pass, card seen in
+  the preview. `tsc` is not installed here, so no type-check ran.
+
+**The desk shows the tool in hand; notice on typing fixed: version 0.7.0 (2026-11-16; not committed)**
+
+First checkpoint of "show what Claude is doing". The user tests each
+checkpoint in the app before the next.
+
+- Notice on typing never played: it hung on `prompt.change`, which fires
+  only for what no edit carried (a recalled entry, a clear). Typing is
+  `prompt.edit`, now hooked too (`perk`, top-level; it returns `next(e)`).
+  Whether the desktop app raises `prompt.edit` is not yet seen.
+- `activityOf(tool, input)` in `logic.js`: `read` (Read, Grep, Glob...),
+  `edit`, `shell`, `web` (WebFetch, WebSearch, any tool named browser,
+  chrome or computer), with a label of a file's own name or a command's
+  first word, never a path or an argument, at most 28 characters.
+- `Room.doing` (`Doing`, shape `room-3`), set by `wanted()` only while the
+  mascot is in `work`. `note` throttles it: the desk changes at most once
+  in `DOING_MS` (1.5 s), to the latest; a finished call's look stays
+  `LINGER_MS` (4 s) and then goes back to plain typing; a turn's end
+  clears it. One atom, so one redraw per change.
+- Scene: `screens(mode, kind)` has a page with a reading bar (`scan`, a
+  new keyframe), a terminal with a cursor, and a browser page; the mascot
+  at the desk reads, leans back or clicks. The label leads the TV's ticker
+  (`tvFace(tv, doing)`), and with a label the ticker never slides: it
+  keeps what fits in 44 characters.
+- Preview: `&mascot=work&doing=read&label=reading%20scene.js`.
+- Checked: validate passes, 32 tests pass, the three screens seen in the
+  preview. No `tsc`. Not seen in the app.
+
+- The user asked for the dash on the mascot only: the kitten now fades out
+  where it was and in where it is (`castOf` gives `blend` the same spot
+  twice). `KITTEN_SPOT` only says a pose is known.
+
+- Flicker in the chat (user, after 0.7.0; 0.7.1). The plugin has no hook
+  on the chat: only `ui.render` for `Backdrop`, `theme.set`, `ui.status`
+  and the prompt hooks. What it can do to the chat is redraw the scene
+  under it (the ninth round tied a hover flicker to state writes). Found
+  and fixed: `sync` and `air` each read, awaited and wrote with nothing to
+  keep two apart, so two running together wrote the same scene twice (a
+  tool's start and end; a prompt's `air`, `survey`'s and a measurement's).
+  Both now run one at a time (`roomQueue`, `tvQueue`). And the new
+  `prompt.edit` hook waited for a redraw before letting the key through;
+  it no longer waits. `/room log` lists the last 40 writes with their
+  time and cause. Not known: whether the flicker the user sees is these
+  writes. Next: the user compares a flicker's time with `/room log`. If
+  they match, cut writes (longer `DOING_MS`, no `LINGER_MS` clear, a
+  throttle on `air`); if not, it is not the plugin's state.
+
+  The user's answer after 0.7.1: the flicker is brief and comes only when
+  the chat's text or its to-do list changes. That is the app drawing the
+  chat over the scene, not a write of ours. Left as it is.
+
+- Checkpoint 2, helpers (0.8.0; not committed, not seen in the app):
+  `turn.start` and `turn.complete` carry `agentId` for a subagent, so
+  `S.agents` (id to last heard of) counts them; a tool call with the id
+  refreshes it and the minute tick drops one silent for `AGENT_MS`
+  (15 min), in case its end never comes. `Room.helpers` (shape `room-4`),
+  up to three. `helpers()` in `scene.js` draws each as a critter at 0.65
+  behind a laptop on the floor in front of the desk (`HELPER_X`, y 856).
+  They show whatever the mascot does. Preview: `&helpers=3` (seen at 0.5
+  scale; enlarged after, not looked at again). 34 tests pass.
+
+  The user saw two helpers come and go with two Haiku subagents: works.
+  0.5.3 to 0.8.0 are committed on branch `live-desk-and-transitions`
+  (dcc1189), not pushed.
+
+- Checkpoint 3, thinking (0.8.1): in a turn with no tool in hand,
+  `wanted()` gives `doing: { kind: 'think', label: 'thinking' }`, so no
+  timer and no extra redraw: it is what the desk shows at a turn's start
+  and when a tool's look clears. Dim screen with three dots; the mascot
+  rests its chin on a hand under three thought dots. Typing code is now
+  only for an edit (and `/room work`, which has no `doing`). Seen in the
+  preview (`&doing=think`), with the helpers at their new size. 34 tests
+  pass. Not seen in the app.
+
+- Checkpoint 4 (0.9.0), not seen in the app:
+  - The ticker says what a moment is: `Shown.news`, stored as `Room.news`
+    (shape `room-5`), leads the ticker for as long as the moment shows:
+    `Tests passed`, `Tests failed`, `Committed`, `Pull request merged!`,
+    and new `Pull request opened` (`classify` gives `pr` for
+    `gh pr create`; confetti, 9 s).
+  - A tool call that failed, other than a test: `doing` of kind `error`
+    (`command failed`, `Read failed`, `a tool failed`), a red screen with
+    a warning sign, the mascot wide-eyed. `note(..., true)` is brief: it
+    clears itself after `LINGER_MS`. The kitten does not flinch (its
+    `startle` pose is on the sill, which would move it).
+  - Found: the test in `tool.call` for a git or gh command held two
+    backspace characters where `\b` was meant (since 0.5.2), so it never
+    matched: the branch, the diff and the pull request were not read
+    again after a git command, only at the next prompt. Now `\b`. Beware
+    of writing `\b` through a script: check with `grep -c $'\x08'`.
+  - 35 tests pass; the error screen seen in the preview (`&doing=error`).
+
+- Checkpoint 5 (0.10.0; not committed, not seen in the app): the notes
+  and the mug.
+  - The shelf's notes are the task list. `tasksAfter` in `logic.js` reads
+    the calls that write one: `TodoWrite`, `TaskCreate` (the id is in the
+    call's answer) and `TaskUpdate`, and the desktop app's own
+    `…update_plan` (`items`, `advance`, `done`, `start`) and `…wrap_up`
+    (all done). Only a mark a task is kept (`p`, `a`, `d`), never its
+    words. `S.tasks` holds the list; `notesOf` gives `Room.notes`, eight
+    letters at most, the stretch around the one in hand. Done: dimmed
+    with a tick; in hand: `shake` and a red pin. With no list the five
+    plain notes are there as before. A list all done goes at the next
+    turn's start; `/clear` empties it. A reload forgets it (module state)
+    until the next call that sends a whole list.
+  - The mug is glass and holds the context: `cupOf(percent)` gives
+    `Room.cup`, 4 to 0, a part less for each 20% used, so a write only
+    when a fifth is crossed (`session.measure` now ends in `sync`). Empty
+    past 80%, which is where the ticker warns, and then no steam.
+    `gauge` now runs with the TV off too.
+  - Shape `room-6`. Preview: `&notes=ddappppp&cup=2`.
+  - Checked: validate passes (same warnings), 38 tests pass, notes and
+    mug seen in the preview by day and night. No `tsc`. Not known:
+    whether the desktop app's `update_plan` call reaches `tool.call`
+    under that name (the match is on the name's end).
+
+- The user saw 0.10.0 in the app: the notes follow the list (so
+  `update_plan` does reach `tool.call`). Their next point: the room is
+  muted and dark, the couch melts into the wall, the notes vanish at night.
+
+- Colour and contrast (0.11.0; not committed, not seen in the app):
+  - The furniture is drawn over the wash, not under it. The wash now
+    covers only the wall, the floor and the window's frame; the lounge,
+    the desk, the shelf (with the notes), the clock's case and the TV's
+    case come after it, darkened by `shaded(svg, L.props)`: one factor a
+    channel, so night keeps its blue (`[0.7, 0.74, 0.95]`). Asleep, the
+    factors are times 0.72. `shaded` takes a number or `[r, g, b]`.
+  - The night wash is a deep blue (`#0a0f3d`, 0.56), dusk a violet; the
+    cast is brighter (`chars` 0.9 at night).
+  - Walls have more colour (slate is `#3b4a6b` to `#4a5d85`; a test names
+    the first). The couch is bright teal with a pink cushion and a shadow;
+    an indigo rug with a gold band lies under the lounge (`rug()`, canvas
+    x up to 358); the
+    floor is warmer, the desk walnut; both glows are
+    stronger.
+  - Checked: validate passes, 38 tests pass; seen in the preview at day
+    (slate, forest), dusk, night and asleep. `docs/room-night.jpg` in the
+    README is now out of date.
+
+- 0.11.1, on the user's word after seeing 0.11.0: the plant clashed with
+  the rug, so it is now half size on the desk's right end, beside the
+  kitten's desk spot (`plant()` is drawn in the desk's group); the chair
+  is a bright maroon (`#c22a52`). 38 tests pass; seen in the preview by
+  day with the kitten on the desk. Not committed.
+  0.11.2: in the app the plant looked clipped at the right edge, so it is
+  20 further left (desk x 1512) and the kitten's desk spot went with it
+  (canvas x 1518, in `kitten()` and `KITTEN_SPOT`).
+  0.11.3: the monitor, keyboard, mug, chair and the mascot's desk spot
+  are 30 further left (`PC.x` 1327, `MUG_X` 1412, chair `translate(42,0)`,
+  `work` and `facepalm` at 1320), so mug, kitten and plant each have room.
+  The tower and the helpers stay. Seen in the preview by day and night.
+  The user saw 0.11.3 in the app and was pleased. 0.10.0 to 0.11.3 are
+  one commit on `live-desk-and-transitions`, not pushed. Next: checkpoint
+  5 below (a permission prompt waiting), which starts with finding the
+  engine's event for it in `.claude-plugin/types/claude-code/index.d.ts`.
+
+- Pull request 2 (`live-desk-and-transitions` to `main`,
+  github.com/SegFault03/lofi-theme/pull/2): the user asked for it to be
+  merged on 2026-11-17, with 0.11.4 and `docs/video.md` in it. Start the
+  next work on a new branch from `main`.
+
+- 0.11.4 (committed and pushed to the pull request), the user's five points on the desk side, which
+  looked duller than the lounge at night: the desk lamp's foot and arm
+  are silver (`#d5dbe6`) and the floor lamp's pole brass; the desk is a
+  deeper mahogany (`#7a3318`); the plant is a brighter green in a brown
+  pot; the chair is a stronger shade of the same maroon (`#e8245e`); the
+  monitor's stand is silver and the keyboard light with blue keys. A
+  ticked note is less faded (0.72). 38 tests pass; seen in the preview
+  by day and night.
+
+- Agreed next, after the checkpoints or beside them: show the plugin
+  off. Plan put to the user: a 15 to 20 s hero clip recorded in the app
+  (the user records; a shot list of `/room` commands and one prompt is
+  to be written), a strip of the five phases and feature close-ups
+  rendered from the preview into `docs/` by a small script, a new README
+  top (`docs/room-night.jpg` is stale), a social preview image, a tagged
+  release, then posts. First part done: `docs/video.md` has the demo
+  repository's setup (tried: its test passes), the prompt to type, the
+  beats and the extra shots. The user records the take. Still to do: the
+  stills script, the README's top, the release.
+
+Next checkpoints, agreed with the user, in this order:
+1. Done: helpers for subagents.
+2. Done: thinking.
+3. Done: a failed tool call (no kitten flinch).
+4. Done: sticky notes as the task list; mug as the context gauge.
+5. A permission prompt waiting: the mascot turns and waves. Needs an
+   engine event for it; not looked up yet.
+6. A stretch at a turn's end; a glance when typing mid-turn.
+
+**A change of pose is drawn as a move: version 0.6.0 (2026-11-16; not committed)**
+
+The user asked for no sudden changes: the mascot should dash to the desk,
+and poses should blend. A redraw is still a whole new document, so the move
+is drawn by the new one.
+
+- `Room` has `was` (the mascot's and kitten's poses before the last change
+  of pose) and `at` (ms), shape `room-2`. `moved` in `register.tsx` sets
+  them in `sync` and in `/room`, only when a pose changes; any other write
+  carries them over. No extra writes.
+- `castOf` and `blend` in `scene.js`: for `since = time.now - room.at`
+  under the move's length (0.4 s + distance / 2000; couch to desk is 1 s),
+  the old pose is drawn at its spot with `opacity="0"` and a 0.3 s `gone`
+  fade, and the new pose fades in (`show`) while it slides from the old
+  spot (`mdash` / `kdash`, keyframes written per move, held for the first
+  12%, then `ease-out`). All one-shots carry `-since` as their delay, so a
+  redraw mid-move (the TV airs right after a prompt) goes on. After the
+  move the document is the plain one. Spots are in `MASCOT_SPOT` and
+  `KITTEN_SPOT`: keep them in step with `mascot()` and `kitten()`.
+- The dash from couch to desk crosses the middle, behind the chat. The
+  rule about the middle is for what stands there.
+- Not done: screens, lamps and the air conditioner still switch at once;
+  the kitten leaves `prowl` from its base spot, not from where it walked
+  to; a kitten change within a second of a mascot change ends the
+  mascot's move early. No walk cycle during the dash (an iteration count
+  with a delay is outside the proven keyframe subset).
+- The first point of the user's list (other loops reset on a change of
+  pose) is what 0.5.4 did: it holds for every redraw. To be confirmed in
+  the app.
+- Preview: `&from=phone,loaf` plays the move on each load; `&since=0.5`
+  draws it that far in. Measured: 120 ms hold, then couch to desk in 1 s,
+  ghost gone by 0.3 s.
+- Checked: validate passes, 29 tests pass. No `tsc` here. Not seen in the
+  app.
+
+**Loops keep their place across a redraw, the walk back: version 0.5.4 (2026-11-16; not committed)**
+
+- A redraw is a new document, so nothing can be read back from the old
+  one. Instead `hoist` (through `phased`) gives every `infinite` animation
+  a negative delay from the clock: seconds since midnight (`time.ms` too)
+  modulo its duration, less the delay the builder wrote. Drawn again, each
+  loop goes on from where it was. The clock's `clk*` glyphs are left alone.
+  One-shot animations (`pop`) still play again, and a pose that changes
+  starts mid-loop. Preview: the kitten was 2.9 px on after a reload 147 ms
+  later (17.6 px/s). Not yet seen in the app, where the swap itself may
+  still show as a flicker.
+- The kitten's walk back lurched: `face` flipped it about `.c`, the middle
+  of its fill box, which moves with the tail and the legs. It now flips
+  about the group's origin (its feet). Measured in the preview: 17 to 18.5
+  px/s both ways.
+- Checked: validate passes, 27 tests pass. No `tsc` here.
+
 **Status TV, air conditioner, date: version 0.4.0 (2026-11-15, seventeenth round; not committed)**
 
 The user saw 0.3.1 in the app (1907x960): it animates, the project and the
@@ -139,11 +401,14 @@ number here differs from the 0.3.1 notes below, this one holds.
 - All of the above was committed on the branch `tv-status-board` and a
   pull request opened from it; the TV's card can now be checked against it.
 
-**Next step for a new session:** the user checks 0.5.2 in the app after
-`/reload-plugins`, then the pull request card against a real pull request
-(open one from a branch; `gh` is installed). Commit only when asked, on a
-branch, not on `main`. An old preview server from an earlier session may
-still hold port 4173.
+**State at the end of the seventeenth round (2026-11-15):** 0.5.2 is on
+`main`: pull request 1 was merged (merge commit 329e509) and its branch
+deleted. CI passed on it. The user saw the card in the app as "Open,
+checks passed" on the real pull request; "Merged" was not confirmed before
+the branch was removed. Nothing is open. Ideas not started: an option for
+the greeting's name, counting untracked files in the diff, a new README
+screenshot (`docs/room-night.jpg` shows the old layout), pinning the CLI in
+CI. An old preview server from an earlier session may still hold port 4173.
 
 - The failing test was the kit: `$.ui.mount` now resolves with a handle
   where it used to refuse. The test asks `keepsBeneath()` instead.

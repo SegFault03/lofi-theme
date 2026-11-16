@@ -66,6 +66,14 @@ These were found the hard way in the desktop app; tests hold most of them.
   and stored, never in the render hook, and the clock is driven by CSS: each
   glyph is lit for its slot of a long `steps(1)` animation, placed by a
   negative delay (`clockColumns`).
+- **Write a loop as `animation:name 2s [delay] ... infinite`.** `hoist`
+  shifts each one's delay by the clock, so a redraw goes on from where the
+  loop was. Do not flip or turn a group about its fill box (`.c`) when
+  parts inside it move: the box's middle moves with them.
+- **A one-shot ends in the state the drawing has without it**, and takes
+  `-since` as its delay (`blend`), so a redraw goes on with it and nothing
+  needs a fill mode. A new pose needs its spot in `MASCOT_SPOT` or
+  `KITTEN_SPOT`.
 - **Give a non-lit clock glyph `opacity="0"` as an attribute**, so a surface
   that draws the scene still shows the right time.
 
