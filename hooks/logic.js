@@ -80,6 +80,41 @@ export function classify(command) {
   return null
 }
 
+const READS = ['Read', 'Grep', 'Glob', 'LS', 'NotebookRead', 'ToolSearch']
+const EDITS = ['Edit', 'Write', 'MultiEdit', 'NotebookEdit']
+const SHELLS = ['Bash', 'PowerShell']
+const short = (text, most = 28) => {
+  const all = [...String(text ?? '').replace(/\s+/g, ' ').trim()]
+
+  return all.length > most ? all.slice(0, most - 1).join('') + '…' : all.join('')
+}
+
+/**
+ * What a tool call is, for the desk: one of `read`, `edit`, `shell`, `web`,
+ * and a few words for the ticker. Only a file's own name and a command's
+ * first word are shown, never a path or an argument. Undefined for a tool
+ * that is none of these.
+ */
+export function activityOf(tool, input = {}) {
+  const name = String(tool ?? '')
+  const file = folderName(input?.file_path ?? input?.notebook_path ?? input?.path)
+
+  if (EDITS.includes(name)) return { kind: 'edit', label: short(file ? `editing ${file}` : 'editing') }
+  if (READS.includes(name)) {
+    return { kind: 'read', label: short(name === 'Read' && file ? `reading ${file}` : name === 'Read' ? 'reading' : 'searching') }
+  }
+  if (SHELLS.includes(name)) {
+    const word = folderName(String(input?.command ?? '').trim().split(/\s+/)[0]).replace(/[^\w.-]/g, '')
+
+    return { kind: 'shell', label: short(word ? `running ${word}` : 'running a command') }
+  }
+  if (/^Web(Fetch|Search)$|browser|chrome|computer/i.test(name)) {
+    return { kind: 'web', label: name === 'WebSearch' ? 'searching the web' : 'browsing' }
+  }
+
+  return undefined
+}
+
 /** About one day in five it rains, the same all day. */
 export function isRainyDay(dayNumber) {
   return (Math.imul(dayNumber | 0, 2654435761) >>> 0) % 5 === 0
@@ -174,6 +209,28 @@ export function prState(json) {
   return checks.length > 0 ? 'passing' : 'open'
 }
 
+/** How long a merged request keeps its card: a day from the merge. */
+export const MERGED_SHOWN_MS = 24 * 3_600_000
+
+/**
+ * The pull request as the TV needs it, from what
+ * `gh pr view --json number,mergedAt,state,...` prints: its word, its number
+ * and when it was merged (ms), each where the reading has one.
+ */
+export function prFacts(json) {
+  const state = prState(json)
+
+  if (state === undefined) return undefined
+  const pr = JSON.parse(String(json))
+  const mergedAt = new Date(pr.mergedAt ?? NaN).getTime()
+
+  return {
+    state,
+    number: Number.isInteger(pr.number) && pr.number > 0 ? pr.number : undefined,
+    mergedAt: Number.isNaN(mergedAt) ? undefined : mergedAt,
+  }
+}
+
 /**
  * What the TV shows, from the session's facts. Every figure is rounded, so
  * the screen (and with it the whole scene) is redrawn only when one moves by
@@ -197,6 +254,10 @@ export function screenOf(facts, now = new Date()) {
   if (quota('five_hour')?.percent > 80) feed.push('Low on 5h usage!')
   if (quota('seven_day')?.percent > 80) feed.push('Low on weekly usage!')
   if (Math.round(context?.percent ?? 0) > 80) feed.push('Context limit reaching soon!')
+  // A merged request is old news after a day: its card goes by itself.
+  const isOldMerge =
+    facts.pr === 'merged' && facts.prMergedAt !== undefined && now.getTime() - facts.prMergedAt > MERGED_SHOWN_MS
+  const hasPr = Boolean(facts.project && facts.branch && facts.pr) && !isOldMerge
 
   return {
     project: facts.project ?? '',
@@ -204,7 +265,8 @@ export function screenOf(facts, now = new Date()) {
     branch: facts.project && facts.branch ? facts.branch : undefined,
     // Both belong to the branch: no branch line, neither.
     diff: facts.project && facts.branch ? facts.diff : undefined,
-    pr: facts.project && facts.branch ? facts.pr : undefined,
+    pr: hasPr ? facts.pr : undefined,
+    prNumber: hasPr ? facts.prNumber : undefined,
     // Shown in place of a name that is not known yet.
     greeting: facts.project && facts.chat ? undefined : greeting(now.getHours(), facts.user),
     fiveHour: quota('five_hour'),

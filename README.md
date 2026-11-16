@@ -80,7 +80,7 @@ terminal session). A change reloads the plugin.
 | `kitten` | on, off | on | Off for a room with no kitten in it. |
 | `celebrations` | on, off | on | Confetti, fireworks, cheers and facepalms. Off keeps the room calm. |
 | `rain` | on, off | on | Off keeps the sky clear every day. |
-| `tv` | on, off | on | A wall TV with your 5-hour and weekly usage, the chat, the project and its git branch (with the lines not yet committed as `+132/-64`, and under it a card for its pull request where `gh` is installed and signed in), and how full the context is, each green, yellow past 50% and red past 80%. Until the project or chat name is known it greets you by your login name (read from `USERNAME` or `USER`). Off takes it down. |
+| `tv` | on, off | on | A wall TV with your 5-hour and weekly usage, the chat, the project and its git branch (with the lines not yet committed as `+132/-64`, and under it a card for its pull request and its number, as `Open #16`, where `gh` is installed and signed in; a merged one goes a day after the merge), and how full the context is, each green, yellow past 50% and red past 80%. Until the project or chat name is known it greets you by your login name (read from `USERNAME` or `USER`). Off takes it down. |
 
 From a shell they can be set as the plugin is installed, one `--config` per
 option:

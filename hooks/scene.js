@@ -152,6 +152,9 @@ text{font-family:ui-monospace,Consolas,Menlo,monospace;font-weight:700}
 @keyframes pop{0%{transform:scale(0)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
 @keyframes shake{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}}
 @keyframes cool{0%{opacity:0;transform:translateY(0)}30%{opacity:.8}100%{opacity:0;transform:translateY(34px)}}
+@keyframes scan{0%,100%{transform:translateY(0px)}50%{transform:translateY(51px)}}
+@keyframes gone{from{opacity:1}to{opacity:0}}
+@keyframes show{from{opacity:0}to{opacity:1}}
 @keyframes tick{from{transform:translateX(232px)}to{transform:translateX(-600px)}}
 `
 
@@ -555,12 +558,52 @@ function chair() {
 }
 
 // What the two screens show. Drawn above the wash, since screens glow.
-function screens(mode) {
+function screens(mode, kind) {
   const { x, y, w, h } = PC
   const out = []
 
   if (mode === 'off') {
     return rect(x, y, w, h, '#0c0e13', 'rx="3"')
+  }
+  // At work the screen shows the tool in hand; with none, or an edit, code
+  // being typed (below).
+  if (mode === 'work' && kind === 'read') {
+    const r = rng(11)
+
+    // A page of text, and a bar that reads down it.
+    out.push(rect(x, y, w, h, '#232a3a', 'rx="3"'))
+    for (let i = 0; i < 7; i++) out.push(rect(x + 8, y + 8 + i * 8.5, n(40 + r() * 52), 4, i === 0 ? '#e8dfd0' : '#8d97ad', 'rx="2"'))
+    out.push(`<g style="animation:scan 3.2s ease-in-out infinite">${rect(x + 4, y + 5.5, w - 8, 9, '#ffd166', 'rx="2" opacity=".3"')}</g>`)
+
+    return out.join('')
+  }
+  if (mode === 'work' && kind === 'shell') {
+    // A terminal: prompts, what they printed, and a cursor that waits.
+    out.push(rect(x, y, w, h, '#0b0d10', 'rx="3"'))
+    for (const [i, len, isPrompt] of [[0, 34, true], [1, 62, false], [2, 48, false], [3, 26, true], [4, 70, false], [5, 0, true]]) {
+      const top = y + 9 + i * 9.5
+
+      if (isPrompt) out.push(`<path d="M${x + 8} ${top}l3 2.5-3 2.5" stroke="#7ae582" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`)
+      if (len > 0) out.push(rect(x + (isPrompt ? 16 : 8), top + 0.5, len, 4, isPrompt ? '#e8dfd0' : '#5b6478', 'rx="2"'))
+    }
+    out.push(`<rect x="${x + 16}" y="${n(y + 9 + 5 * 9.5 - 1)}" width="5" height="7" fill="#7ae582" style="animation:tw 1s steps(1) infinite"/>`)
+
+    return out.join('')
+  }
+  if (mode === 'work' && kind === 'web') {
+    // A browser: the address bar, a page loading under it.
+    return [
+      rect(x, y, w, h, '#e9edf3', 'rx="3"'),
+      rect(x, y, w, 13, '#c9d1e3', 'rx="3"'),
+      `<circle cx="${x + 7}" cy="${y + 6.5}" r="2" fill="#ff5d73"/><circle cx="${x + 14}" cy="${y + 6.5}" r="2" fill="#ffd166"/>`,
+      rect(x + 22, y + 3, w - 30, 7, '#f7f9fc', 'rx="3.5"'),
+      `<rect class="l" x="${x}" y="${y + 13}" width="${w}" height="2.5" fill="#4a90e2" style="animation:type 2.6s steps(9) infinite"/>`,
+      `<circle cx="${x + 22}" cy="${y + 38}" r="12" fill="#6ecbff"/><path d="M${x + 10} ${y + 38}h24M${x + 22} ${y + 26}v24M${x + 22} ${y + 26}q-9 12 0 24M${x + 22} ${y + 26}q9 12 0 24" stroke="#2f6fa8" stroke-width="1.2" fill="none"/>`,
+      rect(x + 42, y + 24, 54, 5, '#5b6478', 'rx="2.5"'),
+      rect(x + 42, y + 34, 44, 4, '#9aa3b5', 'rx="2"'),
+      rect(x + 42, y + 42, 50, 4, '#9aa3b5', 'rx="2"'),
+      rect(x + 42, y + 50, 30, 4, '#9aa3b5', 'rx="2"'),
+    ].join('')
   }
   if (mode === 'work') {
     const r = rng(5)
@@ -753,8 +796,18 @@ function mascot(room) {
       )
     case 'window':
       return at(110, SILL, 0, critter({ look: [7, -5] }), '', 'breathe 4.4s ease-in-out infinite')
-    case 'work':
-      return at(1350, 600 + DESK_DROP, 0, critter({ look: [8, 2], arms: 'tapping' }), '', 'bob .52s infinite')
+    case 'work': {
+      // By the tool in hand: typing for an edit (or none), reading with its
+      // eyes up, leaning back while a command runs, clicking through a page.
+      const kind = room.doing?.kind
+      const spot = [1350, 600 + DESK_DROP]
+
+      if (kind === 'read') return at(...spot, 0, critter({ look: [8, -3] }), '', 'breathe 3s ease-in-out infinite')
+      if (kind === 'shell') return at(...spot, -5, critter({ eyes: 'half', look: [7, 0] }), '', 'breathe 4.2s ease-in-out infinite')
+      if (kind === 'web') return at(...spot, 0, critter({ look: [9, 0], arms: 'tapping' }), '', 'breathe 2.4s ease-in-out infinite')
+
+      return at(...spot, 0, critter({ look: [8, 2], arms: 'tapping' }), '', 'bob .52s infinite')
+    }
     case 'facepalm':
       return at(
         1350,
@@ -882,7 +935,10 @@ function kitten(room) {
     case 'pounce':
       return at(228, 752 + DROP, catStanding({ isSwiping: true }), { turn: -30, motion: 'hop .7s infinite' })
     case 'prowl':
-      return `<g class="zl"><g transform="translate(156,${782 + DROP})"><g style="animation:walk 16s linear infinite"><g class="c" style="animation:face 16s steps(1) infinite">${catStanding({ isWalking: true })}</g></g></g></g>`
+      // The turn is about the feet (the group's own origin), not `.c`: the
+      // middle of the box moves with the tail and the legs, and a turn about
+      // it made the walk back lurch.
+      return `<g class="zl"><g transform="translate(156,${782 + DROP})"><g style="animation:walk 16s linear infinite"><g style="animation:face 16s steps(1) infinite">${catStanding({ isWalking: true })}</g></g></g></g>`
     default:
       return at(329, 592 + DROP, catLoaf(false))
   }
@@ -1011,11 +1067,15 @@ const PR_NOTE = {
   changes: ['changes requested', '#ffb347'],
 }
 
-function prCard(state, y) {
+function prCard(state, y, number) {
   if (!PR_STATES.includes(state)) return ''
-  const [label, fill] = PR_LABEL[state] ?? ['Open', '#238636']
+  const [word, fill] = PR_LABEL[state] ?? ['Open', '#238636']
+  const label = Number.isInteger(number) && number > 0 ? `${word} #${number}` : word
   const width = 16 + Math.ceil(label.length * 4.6)
-  const note = PR_NOTE[state]
+  let note = PR_NOTE[state]
+
+  // A long number leaves the longest note no room: it is cut to its first word.
+  if (note && 82 + width + 17 + note[0].length * WIDE * 7.5 > 234) note = [note[0].split(' ')[0], note[1]]
 
   return [
     rect(82, n(y - 8.3), width, 11, fill, 'rx="5.5"'),
@@ -1041,7 +1101,7 @@ function tvNames(tv) {
   const folder = tv.project ? `<path d="M82 ${b - 6.5}h3.6l1.4 1.5h5v6h-10Z" fill="#e9b44c"/>` : ''
   // What is not committed stands right after the branch's name. A name too
   // long for the room left of it pans, and the figure keeps the line's end.
-  let aside = hasBranch ? prCard(tv.pr, 66.5) : ''
+  let aside = hasBranch ? prCard(tv.pr, 66.5, tv.prNumber) : ''
   let room = 222 - 95
 
   if (hasBranch && tv.diff) {
@@ -1064,13 +1124,17 @@ function tvNames(tv) {
 }
 
 // The picture, drawn over the wash so it glows at night as the screens do.
-function tvFace(tv) {
+function tvFace(tv, doing) {
   const pct = v => (v == null ? '--' : Math.round(v) + '%')
   const quota = (y, label, limit) =>
     `<text x="82" y="${y}" font-size="8.5" fill="${limit ? heat(limit.percent) : '#5b6478'}">${label} ${pct(limit?.percent)}${limit?.resets ? `<tspan fill="#5b6478"> · resets ${fit(limit.resets, 9)}</tspan>` : ''}</text>`
   const ctx = tv.context
   const used = ctx?.percent == null ? 0 : Math.min(100, Math.max(0, ctx.percent))
-  const feed = (tv.feed ?? []).map(item => fit(item, 28)).join('  ·  ')
+  // The tool in hand leads the ticker, and must be read at once: with it the
+  // line never slides, and keeps only as much of the rest as fits.
+  const items = [...(doing?.label ? [doing.label] : []), ...(tv.feed ?? [])]
+  const kept = doing?.label ? items.filter((_, i) => items.slice(0, i + 1).join('  ·  ').length <= 44) : items
+  const feed = kept.map(item => fit(item, 28)).join('  ·  ')
   // A line that fits stands still; a longer one slides by.
   const isSliding = feed.length > 44
 
@@ -1094,11 +1158,30 @@ function tvFace(tv) {
   ].join('')
 }
 
-function hoist(svg) {
+// Every redraw is a new document, whose animations start over. So each loop
+// is told how far into its turn it is by the clock (`at`, seconds since
+// midnight), as a negative delay: drawn again, it goes on from where it was.
+// The clock's own glyphs already carry theirs.
+function phased(declarations, at) {
+  return declarations.replace(
+    /animation:([a-z]+) (\d*\.?\d+)s(?: (-?\d*\.?\d+)s)?([^;]*\binfinite)/,
+    (all, name, seconds, delay, rest) => {
+      const turn = Number(seconds)
+
+      if (name.startsWith('clk') || !(turn > 0)) return all
+      const into = (((at - Number(delay ?? 0)) % turn) + turn) % turn
+
+      return `animation:${name} ${seconds}s ${Math.round(-into * 100) / 100}s${rest}`
+    },
+  )
+}
+
+function hoist(svg, at) {
   const rules = new Map()
   const out = svg.replace(
     /<([a-z]+)((?:\s[^<>]*?)?)\sstyle="([^"]*)"([^<>]*)>/g,
-    (_, tag, before, declarations, after) => {
+    (_, tag, before, written, after) => {
+      const declarations = phased(written, at)
       let name = rules.get(declarations)
 
       if (name === undefined) {
@@ -1155,6 +1238,90 @@ const LOUNGE = `translate(-171,${149 + DROP}) scale(.78)`
 // The desk, slid to the right wall.
 const DESK = `translate(40,${DESK_DROP})`
 
+// Where each pose stands, as its builder places it: a change of pose is
+// drawn as a move from the old spot to the new one.
+const MASCOT_SPOT = {
+  phone: [172, 622 + DROP],
+  scroll: [208, 620 + DROP],
+  nap: [208, 622 + DROP],
+  sleep: [208, 622 + DROP],
+  notice: [172, 622 + DROP],
+  window: [110, SILL],
+  work: [1350, 600 + DESK_DROP],
+  facepalm: [1350, 600 + DESK_DROP],
+  play: [168, 748 + DROP],
+  cheer: [200, 748 + DROP],
+}
+const KITTEN_SPOT = {
+  loaf: [329, 592 + DROP],
+  sleep: [BED_X, 756 + DROP],
+  sill: [290, SILL],
+  startle: [290, SILL],
+  desk: [1532, 560 + DESK_DROP],
+  yarn: [168, 806 + DROP],
+  pounce: [228, 752 + DROP],
+  prowl: [156, 782 + DROP],
+}
+const FADE = 0.3
+
+// One of the cast, `since` seconds after it changed pose: the old pose fades
+// where it stood while the new one comes from there, quicker at first. A
+// redraw mid-way goes on from `since`; after the move, only the new pose.
+// Each one-shot ends in the state the drawing has without it (the old pose
+// carries opacity 0), so nothing needs a fill mode and a still surface shows
+// the new pose alone. `id` names the keyframes: letters only.
+function blend(id, drawn, old, from, to, since) {
+  const [dx, dy] = [n(from[0] - to[0]), n(from[1] - to[1])]
+  const far = Math.hypot(dx, dy)
+  const seconds = n(0.4 + far / 2000)
+
+  if (!(since >= 0 && since < seconds)) return { svg: drawn, css: '' }
+  const delay = `${Math.round(-since * 100) / 100}s`
+  const ghost = since < FADE ? `<g opacity="0" style="animation:gone ${FADE}s ${delay} linear">${old}</g>` : ''
+  const shown = since < FADE ? `<g style="animation:show ${FADE}s ${delay} linear">${drawn}</g>` : drawn
+
+  if (far === 0) return { svg: ghost + shown, css: '' }
+
+  return {
+    svg: `${ghost}<g style="animation:${id} ${seconds}s ${delay} ease-out">${shown}</g>`,
+    // Held for a moment first: the app takes one to put a new drawing up.
+    css: `@keyframes ${id}{0%,12%{transform:translate(${dx}px,${dy}px)}100%{transform:translate(0px,0px)}}`,
+  }
+}
+
+// A helper for each subagent at work: a small critter on the floor in front
+// of the desk, behind a laptop. They take the floor's right end, one by one.
+const HELPER_X = [1490, 1556, 1424]
+
+function helpers(count) {
+  return HELPER_X.slice(0, Math.max(0, Math.min(HELPER_X.length, count | 0)))
+    .map(
+      (x, i) =>
+        `<g class="zr"><g transform="translate(${x},856) scale(.65)"><g class="f" style="animation:bob .6s ${n(-i * 0.2)}s infinite">${critter({ look: [3, 4] })}</g>${rect(-24, -34, 48, 30, '#2b2f3a', 'rx="3"')}<circle cx="0" cy="-19" r="4" fill="#d97757" style="animation:pulse 1.6s ${n(-i * 0.5)}s infinite"/>${rect(-28, -5, 56, 5, '#9aa3b5', 'rx="2"')}</g></g>`,
+    )
+    .join('')
+}
+
+// The two of them, each moving from its last pose where that just changed
+// (`room.was`, at `room.at`; `time.now` is the same clock).
+function castOf(room, time, hasKitten) {
+  const since = room.was && room.at !== undefined && time.now !== undefined ? (time.now - room.at) / 1000 : -1
+  const still = svg => ({ svg, css: '' })
+  const a =
+    since >= 0 && room.was.mascot !== room.mascot && MASCOT_SPOT[room.was.mascot] && MASCOT_SPOT[room.mascot]
+      ? blend('mdash', mascot(room), mascot({ ...room, mascot: room.was.mascot, isWaiting: false }), MASCOT_SPOT[room.was.mascot], MASCOT_SPOT[room.mascot], since)
+      : still(mascot(room))
+
+  if (!hasKitten) return a
+  const b =
+    since >= 0 && room.was.kitten !== room.kitten && KITTEN_SPOT[room.was.kitten] && KITTEN_SPOT[room.kitten]
+      ? // The kitten does not dash (the user's call): it fades out where it was and in where it is.
+        blend('kdash', kitten(room), kitten({ ...room, kitten: room.was.kitten }), KITTEN_SPOT[room.kitten], KITTEN_SPOT[room.kitten], since)
+      : still(kitten(room))
+
+  return { svg: a.svg + b.svg, css: a.css + b.css }
+}
+
 // What the desktop app's backdrop frame cannot take (found by taking the
 // scene apart, 2026-11-15): a CSS `filter`, or an `@media` rule, anywhere in
 // the document stills every animation in it. So the cast is darkened by
@@ -1180,8 +1347,9 @@ export function buildScene(room, time = { h: 12, m: 0, s: 0 }, look = {}) {
           : isAsleep
             ? 'off'
             : 'idle'
-  const style = `<style>${CSS}${look.tv ? tvNames(look.tv).css : ''}</style>`
-  const cast = `<g>${shaded(mascot(room) + (hasKitten ? kitten(room) : ''), L.chars)}</g>`
+  const players = castOf(room, time, hasKitten)
+  const style = `<style>${CSS}${look.tv ? tvNames(look.tv).css : ''}${players.css}</style>`
+  const cast = `<g>${shaded(players.svg + helpers(room.helpers), L.chars)}</g>`
 
   // The wash covers the room but not the window glass.
   // One path with a hole per pane, where a mask would have been.
@@ -1232,9 +1400,9 @@ export function buildScene(room, time = { h: 12, m: 0, s: 0 }, look = {}) {
     `<g class="zr"><g transform="${DESK}">${desk()}<g transform="translate(72,0)">${chair()}</g></g>${shelf()}${clockCase()}${look.tv ? tvCase() : poster()}</g>`,
     wash,
     `<g class="zl">${left.join('')}</g>`,
-    `<g class="zr"><g transform="${DESK}">${right.join('')}${screens(screenMode)}${deskLamp(isSteamy, dim > 0.2)}<rect x="1468" y="598" width="6" height="68" rx="3" fill="#ff3d7f" style="animation:pulse 2.4s infinite"/>${steam}</g>${clockFace(time, look.clock)}${look.tv ? tvFace(look.tv) : ''}</g>`,
+    `<g class="zr"><g transform="${DESK}">${right.join('')}${screens(screenMode, room.doing?.kind)}${deskLamp(isSteamy, dim > 0.2)}<rect x="1468" y="598" width="6" height="68" rx="3" fill="#ff3d7f" style="animation:pulse 2.4s infinite"/>${steam}</g>${clockFace(time, look.clock)}${look.tv ? tvFace(look.tv, room.mascot === 'work' ? room.doing : undefined) : ''}</g>`,
     cast,
     room.fx === 'confetti' ? confetti() : '',
     '</svg>',
-  ].join(''))
+  ].join(''), time.h * 3600 + time.m * 60 + (time.s ?? 0) + (time.ms ?? 0) / 1000)
 }

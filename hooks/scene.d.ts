@@ -2,7 +2,9 @@ import type { Room, Screen, Wall } from '../types'
 
 /** A wall-clock time; `s` defaults to 0. */
 /** `day` is the date under the clock, as `dateLabel` writes it. */
-export type Time = { h: number; m: number; s?: number; day?: string }
+/** `ms` defaults to 0. Every loop starts as far into its turn as the time says. */
+/** `now` is the clock `Room.at` is read by (ms): without it no change of pose is drawn as a move. */
+export type Time = { h: number; m: number; s?: number; ms?: number; now?: number; day?: string }
 
 /** What the person chose in the plugin's options. */
 export type Look = { clock?: '24h' | '12h'; wall?: Wall; hasKitten?: boolean; tv?: Screen }
