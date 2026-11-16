@@ -11,6 +11,8 @@ export type MascotPose =
   | 'sleep'
   | 'cheer'
   | 'facepalm'
+  | 'feed'
+  | 'water'
 
 export type KittenPose =
   | 'loaf'
@@ -21,6 +23,10 @@ export type KittenPose =
   | 'sleep'
   | 'startle'
   | 'pounce'
+  | 'eat'
+
+/** Where the desk plant is in its week of flowering. */
+export type Bloom = 'none' | 'bud' | 'small' | 'full' | 'wilt' | 'fallen'
 
 export type Fx = 'none' | 'confetti' | 'fireworks'
 
@@ -49,6 +55,8 @@ export type Room = {
   notes?: string
   /** The coffee left in the mug, 4 (full) to 0, as the context fills. */
   cup?: number
+  /** The plant's flowers today; absent for none. */
+  bloom?: Bloom
   /** The poses before the last change of pose, and when that was (ms): the scene draws the move. */
   was?: { mascot: MascotPose; kitten: KittenPose }
   at?: number

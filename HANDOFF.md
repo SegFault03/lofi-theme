@@ -227,6 +227,37 @@ checkpoint in the app before the next.
   0.11.4's green (`#1f9a4c`, `#35c46a`, stems `#1c7a3e`); the chair and
   the pot keep the new colours.
 
+- Chores and flowers (0.12.0, branch `care-and-bloom` from `main`; in a
+  pull request; the user ran both commands in the app), as the user asked:
+  - Feeding: `isFeedingTime(now, fedAt)` in `logic.js` is true when the
+    kitten has not eaten today or for `FEED_MS` (2 h). Watering:
+    `isWateringTime(now, wateredAt)`, once a day, from 6 to 17 o'clock.
+    `care($)` looks once a minute (the tick) and does one, water first,
+    only between turns, with no other moment on show, not while the
+    mascot notices typing or sleeps, and not in a pinned room. With the
+    kitten option off nothing is fed.
+  - `tend($, chore)` notes the time in `S.fedAt` / `S.wateredAt` and in
+    `$.store` (`fedAt`, `wateredAt`, ms), read back at `session.start`, so
+    they hold across sessions. It shows the chore with `flash` and
+    `isCare: true`: not held back by the celebrations option, and cut
+    short by a turn's start. 14 s for a meal, 11 s for the can.
+  - `/room feed` and `/room water` (one word alone) do the chore now,
+    unpin the room and reset the count. With other words, `feed` and
+    `water` are poses like any other and pin.
+  - Scene: mascot poses `feed` (a bag shaken over the bowl, on the rug)
+    and `water` (on a step stool before the desk, a can over the plant);
+    kitten pose `eat` (mirrored by its group's own `scale(-1,1)`, about
+    its feet). A bowl (`bowl()`, `BOWL`) is on the rug whenever there is
+    a kitten. Kibble and water fall on the `cool` keyframe.
+  - Flowers: `bloomAt(localDay(now))` gives `Room.bloom` (shape
+    `room-7`): a week of none, bud, small, full, full, wilt, fallen, by
+    the local calendar, the same for everyone on the same day. Watering
+    does not move it. `plant(t, bloom)` draws them at the leaves' tips.
+  - Preview: `&mascot=feed&kitten=eat`, `&mascot=water`, `&bloom=full`.
+  - Checked: validate passes, 42 tests pass, each seen in the preview.
+    Not tested: `care` itself, since the test kit has no clock; only its
+    two questions and the commands are.
+
 Next checkpoints, agreed with the user, in this order:
 1. Done: helpers for subagents.
 2. Done: thinking.

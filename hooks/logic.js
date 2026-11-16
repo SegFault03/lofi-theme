@@ -13,6 +13,8 @@ export const MASCOT_POSES = [
   'sleep',
   'cheer',
   'facepalm',
+  'feed',
+  'water',
 ]
 export const KITTEN_POSES = [
   'loaf',
@@ -23,6 +25,7 @@ export const KITTEN_POSES = [
   'sleep',
   'startle',
   'pounce',
+  'eat',
 ]
 
 /** The lighting phase for a local hour, 0 to 24 (fractions allowed). */
@@ -120,6 +123,50 @@ export function activityOf(tool, input = {}) {
 /** About one day in five it rains, the same all day. */
 export function isRainyDay(dayNumber) {
   return (Math.imul(dayNumber | 0, 2654435761) >>> 0) % 5 === 0
+}
+
+// ---------------------------------------------------------------- the care
+
+/** The kitten is fed again once this long has passed. */
+export const FEED_MS = 2 * 60 * 60_000
+
+const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString()
+
+/**
+ * Whether the kitten is due a meal: not fed yet today, or FEED_MS ago.
+ * `fedAt` is when it last was (ms), if ever.
+ */
+export function isFeedingTime(now, fedAt) {
+  if (typeof fedAt !== 'number' || !Number.isFinite(fedAt)) return true
+
+  return !sameDay(now, fedAt) || now - fedAt >= FEED_MS
+}
+
+/**
+ * Whether the plant is due its water: once a day, in the morning or the
+ * afternoon. `wateredAt` is when it last was (ms), if ever.
+ */
+export function isWateringTime(now, wateredAt) {
+  const hour = new Date(now).getHours()
+
+  if (hour < 6 || hour >= 17) return false
+
+  return typeof wateredAt !== 'number' || !Number.isFinite(wateredAt) || !sameDay(now, wateredAt)
+}
+
+/** The plant's week, a day each: bare, buds, first flowers, two days in bloom, wilting, fallen. */
+export const BLOOMS = ['none', 'bud', 'small', 'full', 'full', 'wilt', 'fallen']
+
+/** Where the plant is in its week, for a count of days. */
+export function bloomAt(dayNumber) {
+  return BLOOMS[(((dayNumber | 0) % 7) + 7) % 7]
+}
+
+/** The count of local days up to `now` (ms): it turns over at the person's midnight. */
+export function localDay(now) {
+  const at = new Date(now)
+
+  return Math.floor((at.getTime() - at.getTimezoneOffset() * 60_000) / 86_400_000)
 }
 
 // ---------------------------------------------------------------- the tasks

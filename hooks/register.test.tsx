@@ -3,6 +3,10 @@ import type { TestBody } from 'claude-code/testing'
 
 import {
   activityOf,
+  bloomAt,
+  BLOOMS,
+  isFeedingTime,
+  isWateringTime,
   classify,
   cupOf,
   dateLabel,
@@ -916,4 +920,87 @@ test('a plan and the context reach the shelf and the mug', async ($, on) => {
   expect(source).toContain('animation:shake 1.2s')
   // 65% used: one part of four is left in the mug.
   expect(source).toMatch(/width="14" height="4\.5" fill="#/)
+})
+
+test('the kitten is fed by the day and the hours, the plant watered once while it is light', () => {
+  const at = (h: number, m = 0, day = 17) => new Date(2026, 10, day, h, m).getTime()
+
+  // Never fed, or not yet today: due. Fed today: again after two hours.
+  expect(isFeedingTime(at(9))).toBe(true)
+  expect(isFeedingTime(at(0, 10), at(23, 30, 16))).toBe(true)
+  expect(isFeedingTime(at(10, 59), at(9))).toBe(false)
+  expect(isFeedingTime(at(11), at(9))).toBe(true)
+  // Water: in the morning or the afternoon, and once.
+  expect(isWateringTime(at(5, 59))).toBe(false)
+  expect(isWateringTime(at(6))).toBe(true)
+  expect(isWateringTime(at(16, 59))).toBe(true)
+  expect(isWateringTime(at(17))).toBe(false)
+  expect(isWateringTime(at(15), at(7))).toBe(false)
+  expect(isWateringTime(at(9), at(9, 0, 16))).toBe(true)
+  // The plant's week comes round: buds, flowers, wilting, bare again.
+  expect([0, 1, 2, 3, 4, 5, 6, 7, -1].map(bloomAt)).toEqual(['none', 'bud', 'small', 'full', 'full', 'wilt', 'fallen', 'none', 'fallen'])
+  expect(BLOOMS.length).toBe(7)
+})
+
+test('the chores and the flowers are drawn, each on its own side', () => {
+  const base = { phase: 'day', mascot: 'phone', kitten: 'loaf', fx: 'none', isRaining: false, isWaiting: false } as const
+  const at = { h: 12, m: 0, s: 0 }
+  const meal = buildScene({ ...base, mascot: 'feed', kitten: 'eat' }, at)
+  const can = buildScene({ ...base, mascot: 'water' }, at)
+
+  // Food falls into the bowl, where the kitten stands turned towards it.
+  expect(meal).toContain('fill="#8a5a2b"')
+  expect(meal).toContain('scale(-1,1) rotate(13)')
+  // Water falls from the can; the bowl is there with or without a meal.
+  expect(can).toContain('fill="#9fd8ff"')
+  expect(can).toContain('fill="#6ecbff"')
+  expect(buildScene(base, at, { hasKitten: false })).not.toContain('fill="#a9e0ff"')
+  // Each day of the week has its own plant.
+  const plants = BLOOMS.map(bloom => buildScene({ ...base, bloom }, at))
+
+  expect(plants[0]).not.toContain('#ff6f91"/><circle')
+  expect(plants[1].split('r="6" fill="#ff6f91"').length).toBe(4)
+  expect(plants[3].split('fill="#ffd23f"').length - plants[0].split('fill="#ffd23f"').length).toBe(5)
+  expect(plants[5]).toContain('fill="#b58a7c"')
+  expect(plants[6]).toContain('fill="#d99aa8"')
+  expect(plants[6]).not.toContain('fill="#b58a7c"')
+  for (const drawn of [meal, can, ...plants]) {
+    expect(drawn).not.toMatch(/\sstyle="|filter|@media/)
+    expect(drawn.length).toBeLessThan(131_072)
+  }
+})
+
+test('/room feed and /room water show the chore and note when it was done', async ($, on) => {
+  const kept: Record<string, unknown> = {}
+
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('store.get', (_, e) => ({ value: kept[e.key] }))
+  on('store.set', (_, e) => {
+    kept[e.key] = e.value
+
+    return { value: undefined }
+  })
+
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  const fed = await $.command.run({ command: 'room', args: 'feed' })
+
+  expect(fed.text).toBe('The kitten is fed.')
+  expect((await drawn($)).alt).toContain('"feed" pose and the kitten in its "eat" pose')
+  expect(typeof kept.fedAt).toBe('number')
+  const watered = await $.command.run({ command: 'room', args: 'water' })
+
+  expect(watered.text).toBe('The plant is watered.')
+  expect((await drawn($)).alt).toContain('"water" pose')
+  expect(typeof kept.wateredAt).toBe('number')
+})
+
+test('with no kitten there is nothing to feed', { options: { kitten: false } }, async ($, on) => {
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  expect((await $.command.run({ command: 'room', args: 'feed' })).text).toContain('no kitten')
 })
