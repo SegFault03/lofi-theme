@@ -125,11 +125,75 @@ checkpoint in the app before the next.
     of writing `\b` through a script: check with `grep -c $'\x08'`.
   - 35 tests pass; the error screen seen in the preview (`&doing=error`).
 
+- Checkpoint 5 (0.10.0; not committed, not seen in the app): the notes
+  and the mug.
+  - The shelf's notes are the task list. `tasksAfter` in `logic.js` reads
+    the calls that write one: `TodoWrite`, `TaskCreate` (the id is in the
+    call's answer) and `TaskUpdate`, and the desktop app's own
+    `…update_plan` (`items`, `advance`, `done`, `start`) and `…wrap_up`
+    (all done). Only a mark a task is kept (`p`, `a`, `d`), never its
+    words. `S.tasks` holds the list; `notesOf` gives `Room.notes`, eight
+    letters at most, the stretch around the one in hand. Done: dimmed
+    with a tick; in hand: `shake` and a red pin. With no list the five
+    plain notes are there as before. A list all done goes at the next
+    turn's start; `/clear` empties it. A reload forgets it (module state)
+    until the next call that sends a whole list.
+  - The mug is glass and holds the context: `cupOf(percent)` gives
+    `Room.cup`, 4 to 0, a part less for each 20% used, so a write only
+    when a fifth is crossed (`session.measure` now ends in `sync`). Empty
+    past 80%, which is where the ticker warns, and then no steam.
+    `gauge` now runs with the TV off too.
+  - Shape `room-6`. Preview: `&notes=ddappppp&cup=2`.
+  - Checked: validate passes (same warnings), 38 tests pass, notes and
+    mug seen in the preview by day and night. No `tsc`. Not known:
+    whether the desktop app's `update_plan` call reaches `tool.call`
+    under that name (the match is on the name's end).
+
+- The user saw 0.10.0 in the app: the notes follow the list (so
+  `update_plan` does reach `tool.call`). Their next point: the room is
+  muted and dark, the couch melts into the wall, the notes vanish at night.
+
+- Colour and contrast (0.11.0; not committed, not seen in the app):
+  - The furniture is drawn over the wash, not under it. The wash now
+    covers only the wall, the floor and the window's frame; the lounge,
+    the desk, the shelf (with the notes), the clock's case and the TV's
+    case come after it, darkened by `shaded(svg, L.props)`: one factor a
+    channel, so night keeps its blue (`[0.7, 0.74, 0.95]`). Asleep, the
+    factors are times 0.72. `shaded` takes a number or `[r, g, b]`.
+  - The night wash is a deep blue (`#0a0f3d`, 0.56), dusk a violet; the
+    cast is brighter (`chars` 0.9 at night).
+  - Walls have more colour (slate is `#3b4a6b` to `#4a5d85`; a test names
+    the first). The couch is bright teal with a pink cushion and a shadow;
+    an indigo rug with a gold band lies under the lounge (`rug()`, canvas
+    x up to 358); the
+    floor is warmer, the desk walnut; both glows are
+    stronger.
+  - Checked: validate passes, 38 tests pass; seen in the preview at day
+    (slate, forest), dusk, night and asleep. `docs/room-night.jpg` in the
+    README is now out of date.
+
+- 0.11.1, on the user's word after seeing 0.11.0: the plant clashed with
+  the rug, so it is now half size on the desk's right end, beside the
+  kitten's desk spot (`plant()` is drawn in the desk's group); the chair
+  is a bright maroon (`#c22a52`). 38 tests pass; seen in the preview by
+  day with the kitten on the desk. Not committed.
+  0.11.2: in the app the plant looked clipped at the right edge, so it is
+  20 further left (desk x 1512) and the kitten's desk spot went with it
+  (canvas x 1518, in `kitten()` and `KITTEN_SPOT`).
+  0.11.3: the monitor, keyboard, mug, chair and the mascot's desk spot
+  are 30 further left (`PC.x` 1327, `MUG_X` 1412, chair `translate(42,0)`,
+  `work` and `facepalm` at 1320), so mug, kitten and plant each have room.
+  The tower and the helpers stay. Seen in the preview by day and night.
+  The user saw 0.11.3 in the app and was pleased. 0.10.0 to 0.11.3 are
+  one commit on `live-desk-and-transitions`, not pushed. Next: checkpoint
+  5 below (a permission prompt waiting), which starts with finding the
+  engine's event for it in `.claude-plugin/types/claude-code/index.d.ts`.
+
 Next checkpoints, agreed with the user, in this order:
 1. Done: helpers for subagents.
 2. Done: thinking.
 3. Done: a failed tool call (no kitten flinch).
-4. Sticky notes as the task list; mug as the context gauge.
+4. Done: sticky notes as the task list; mug as the context gauge.
 5. A permission prompt waiting: the mascot turns and waves. Needs an
    engine event for it; not looked up yet.
 6. A stretch at a turn's end; a glance when typing mid-turn.

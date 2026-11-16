@@ -43,3 +43,9 @@ export function prFacts(json: unknown): { state: PrState; number?: number; merge
 export function dateLabel(now?: Date): string
 export function greeting(hour: number, name?: string): string
 export function screenOf(facts: ScreenFacts, now?: Date): Screen
+/** One task of the session's list: `p` pending, `a` in hand, `d` done. */
+export type Task = { id?: string; mark: 'p' | 'a' | 'd' }
+export const MOST_NOTES: number
+export function tasksAfter(tasks: readonly Task[], tool: unknown, input?: unknown, result?: unknown): Task[]
+export function notesOf(tasks: readonly Task[]): string | undefined
+export function cupOf(percent: unknown): number | undefined

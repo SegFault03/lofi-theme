@@ -19,6 +19,10 @@ session is doing.
   command. Late at night, once things go quiet, it sleeps.
 - **Small celebrations.** Confetti on a `git commit`, fireworks outside on a
   `gh pr merge`, a cheer on a passing test run and a facepalm on a failing one.
+- **The task list on sticky notes.** Under the shelf, one note a task: a
+  tick on each one done, a flutter and a red pin for the one in hand.
+- **A mug for the context.** The coffee goes down as the context window
+  fills, and an empty mug stops steaming.
 - **A kitten** with a life of its own: the windowsill, the yarn, the warm desk.
 - **The chat is untouched.** The room sits at the two sides of the window;
   nothing is drawn behind or over the conversation.

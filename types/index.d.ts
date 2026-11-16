@@ -45,6 +45,10 @@ export type Room = {
   news?: string
   /** How many subagents are at work, up to three: a small helper by the desk for each. */
   helpers?: number
+  /** The task list, a letter a task (`p` pending, `a` in hand, `d` done), eight at most: the notes under the shelf. */
+  notes?: string
+  /** The coffee left in the mug, 4 (full) to 0, as the context fills. */
+  cup?: number
   /** The poses before the last change of pose, and when that was (ms): the scene draws the move. */
   was?: { mascot: MascotPose; kitten: KittenPose }
   at?: number

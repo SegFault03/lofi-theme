@@ -4,6 +4,7 @@ import type { EngineInterface, PluginOptions, Register, Timer } from 'claude-cod
 import type { Doing, Fx, KittenPose, MascotPose, Phase, Room, Screen, Wall } from '../types'
 import {
   classify,
+  cupOf,
   dateLabel,
   diffStat,
   folderName,
@@ -12,13 +13,15 @@ import {
   isRainyDay,
   KITTEN_POSES,
   kittenPose,
+  notesOf,
   MASCOT_POSES,
   PHASES,
   phaseAt,
   restPose,
   screenOf,
+  tasksAfter,
 } from './logic.js'
-import type { ScreenFacts } from './logic.js'
+import type { ScreenFacts, Task } from './logic.js'
 import { buildScene, WALLS } from './scene.js'
 
 const PLUGIN = 'lofi-theme'
@@ -34,7 +37,7 @@ const INITIAL: Room = {
 }
 // Change the tag when Room's fields change: it declines what older code stored.
 const room = atom({ plugin: 'lofi-theme', key: 'room' } as const, INITIAL, {
-  shape: 'room-5',
+  shape: 'room-6',
 })
 // Bumped to have the scene drawn again with the time as it is now: the clock's
 // digits run on the scene's own CSS, which a sleeping machine leaves behind.
@@ -134,6 +137,8 @@ const S = {
   // The subagents at work, each with when it was last heard of: one whose
   // end never comes is let go after AGENT_MS.
   agents: new Map<string, number>(),
+  // The session's task list, as the tool calls that write it have left it.
+  tasks: [] as Task[],
 }
 
 // What the session has told us for the TV. It starts over on a reload; the
@@ -198,6 +203,12 @@ function wanted(): Omit<Room, 'isPinned'> {
   if (S.show?.news !== undefined) room.news = S.show.news
   // A small helper by the desk for each subagent at work.
   if (S.agents.size > 0) room.helpers = Math.min(MOST_HELPERS, S.agents.size)
+  // The task list as the notes under the shelf; the context as the mug's coffee.
+  const notes = notesOf(S.tasks)
+  const cup = cupOf(F.context?.percent)
+
+  if (notes !== undefined) room.notes = notes
+  if (cup !== undefined) room.cup = cup
 
   return room
 }
@@ -432,7 +443,6 @@ async function tune($: EngineInterface, cwd: string): Promise<void> {
 
   // Empty is left for `air` to ask about again.
   F.project = folderName(repo?.root ?? cwd) || undefined
-  await gauge($)
   await scout($)
   await air($)
   void survey($).catch(() => undefined)
@@ -463,6 +473,8 @@ export const register: Register = (on, options) => {
     })
     // A refused backdrop must not stop the rest of the setup.
     await dress($).catch(() => undefined)
+    // The mug wants the context's fill, with or without the TV.
+    await gauge($).catch(() => undefined)
     rollRest()
     rollPet()
     await sync($)
@@ -519,6 +531,8 @@ export const register: Register = (on, options) => {
       F.rateLimits = e.rateLimits
       F.cost = e.cost
       await air($)
+      // The mug's level: a write only when it crosses a fifth.
+      await sync($)
     } catch {
       // Display only.
     }
@@ -537,8 +551,11 @@ export const register: Register = (on, options) => {
         hasHeardTitle = true
         F.chat = e.session_title
       }
-      if (O.hasTv) await gauge($)
+      // A cleared chat has no list.
+      if (e.source === 'clear') S.tasks = []
+      await gauge($)
       await air($)
+      await sync($)
     } catch {
       // Display only.
     }
@@ -609,6 +626,8 @@ export const register: Register = (on, options) => {
         S.noticeTimer?.cancel()
         S.hasBackgroundWork = false
         S.lastActiveAt = Date.now()
+        // A list all done has had its turn on the shelf.
+        if (S.tasks.every(each => each.mark === 'd')) S.tasks = []
         // The kitten likes a warm desk.
         if (Math.random() < 0.5) S.pet = 'desk'
         await sync($)
@@ -702,6 +721,9 @@ export const register: Register = (on, options) => {
         S.hasBackgroundWork = true
       }
       const kind = isShell ? classify(input.command) : null
+
+      // A call that wrote the task list: the notes follow with the next sync.
+      if (!hasFailed) S.tasks = tasksAfter(S.tasks, e.tool, e, ran.result)
 
       // A git or gh command may have changed the branch, what is committed
       // or the pull request.

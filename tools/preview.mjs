@@ -26,6 +26,9 @@ function page(query) {
     doing: query.has('doing') ? { kind: query.get('doing'), label: query.get('label') ?? `${query.get('doing')} scene.js` } : undefined,
     // &helpers=2 for subagents at work.
     helpers: number('helpers', 0),
+    // &notes=ddappp for a task list (done, in hand, pending); &cup=2 for a half-drunk mug.
+    notes: query.get('notes') ?? undefined,
+    cup: query.has('cup') ? number('cup', 4) : undefined,
     // &from=phone,loaf for the poses it just left: each load plays the move.
     // &since=0.5 for a drawing that many seconds into it.
     was: query.has('from') ? { mascot: query.get('from').split(',')[0], kitten: query.get('from').split(',')[1] ?? (query.get('kitten') ?? 'loaf') } : undefined,
