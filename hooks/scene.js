@@ -402,7 +402,7 @@ const NOTE_DROPS = [2, 6, 0, 6, 1, 5, 0, 4]
 function note(x, y, color, turn, mark) {
   const face =
     mark === 'd'
-      ? `${rect(x, y, 22, 22, color, 'opacity=".5"')}<path d="M${x + 5} ${y + 12}l4 4 8-9" stroke="#1f7a3d" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+      ? `${rect(x, y, 22, 22, color, 'opacity=".72"')}<path d="M${x + 5} ${y + 12}l4 4 8-9" stroke="#1f7a3d" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
       : `${rect(x, y, 22, 22, color)}<path d="M${x + 4} ${y + 8}h14M${x + 4} ${y + 13}h9" stroke="#2b1d16" stroke-width="1.4" opacity=".45"/>`
   const inHand =
     mark === 'a'
@@ -477,8 +477,8 @@ const SHADE = `<path d="M258 ${382 + LAMP_CUT}h54l-10-46h-34Z"`
 
 function lamp(isOn) {
   return [
-    `<ellipse cx="285" cy="668" rx="24" ry="6" fill="#3a322c"/>`,
-    rect(283, 380 + LAMP_CUT, 4, 288 - LAMP_CUT, '#3a322c'),
+    `<ellipse cx="285" cy="668" rx="24" ry="6" fill="#c9a55a"/>`,
+    rect(283, 380 + LAMP_CUT, 4, 288 - LAMP_CUT, '#c9a55a'),
     `${SHADE} fill="${isOn ? '#ffe9b0' : '#e6d6b0'}"/>`,
   ].join('')
 }
@@ -540,9 +540,9 @@ function plant() {
   return `<g transform="translate(1512,527) scale(.5)"><g class="f" style="animation:leaf 8s infinite">${leaves
     .map(
       ([x, y, turn], i) =>
-        `<path d="M0 0L${x} ${y}" stroke="#2f6e45" stroke-width="3"/><ellipse cx="${x}" cy="${y}" rx="13" ry="24" fill="${i % 2 ? '#3f8f5a' : '#327a4a'}" transform="rotate(${turn} ${x} ${y})"/>`,
+        `<path d="M0 0L${x} ${y}" stroke="#1c7a3e" stroke-width="3"/><ellipse cx="${x}" cy="${y}" rx="13" ry="24" fill="${i % 2 ? '#35c46a' : '#1f9a4c'}" transform="rotate(${turn} ${x} ${y})"/>`,
     )
-    .join('')}</g><path d="M-24 0h48l-6 66h-36Z" fill="#c0694e"/><rect x="-27" y="-4" width="54" height="10" rx="3" fill="#d17d62"/></g>`
+    .join('')}</g><path d="M-24 0h48l-6 66h-36Z" fill="#a8643a"/><rect x="-27" y="-4" width="54" height="10" rx="3" fill="#c98450"/></g>`
 }
 
 // Where the one screen is: its picture, inside the bezel.
@@ -553,27 +553,27 @@ function desk(cup = 4) {
   const coffee = Math.max(0, Math.min(4, cup)) * 4.5
 
   return [
-    rect(1192, 572, 10, 102, '#5f391f'),
-    rect(1530, 572, 10, 102, '#5f391f'),
+    rect(1192, 572, 10, 102, '#4f1f0d'),
+    rect(1530, 572, 10, 102, '#4f1f0d'),
     // The tower under the desk.
     rect(1460, 590, 54, 84, '#23262e', 'rx="5"'),
     `<circle cx="1494" cy="646" r="13" fill="#15171c"/><circle cx="1494" cy="646" r="5" fill="#2d3039"/>`,
-    rect(1180, 560, 372, 12, '#8a5632', 'rx="3"'),
-    rect(1180, 570, 372, 3, '#5f391f', 'opacity=".6"'),
+    rect(1180, 560, 372, 12, '#7a3318', 'rx="3"'),
+    rect(1180, 570, 372, 3, '#4f1f0d', 'opacity=".6"'),
     // The monitor: stand and bezel. Its screen is drawn above the wash.
-    rect(PC.x + 49, 516, 10, 38, '#3a3f4b'),
-    rect(PC.x + 31, 552, 46, 8, '#3a3f4b', 'rx="3"'),
+    rect(PC.x + 49, 516, 10, 38, '#aab3c5'),
+    rect(PC.x + 31, 552, 46, 8, '#aab3c5', 'rx="3"'),
     rect(PC.x - 5, PC.y - 5, PC.w + 10, PC.h + 10, '#1b1e26', 'rx="6"'),
     // Keyboard and mug.
-    rect(1302, 552, 62, 8, '#2d3039', 'rx="2.5"'),
-    `<path d="M1306 555h54" stroke="#6ecbff" stroke-width="1.5" stroke-dasharray="4 2" opacity=".8"/>`,
+    rect(1302, 552, 62, 8, '#e3e8f1', 'rx="2.5"'),
+    `<path d="M1306 555h54" stroke="#3b6fd9" stroke-width="2" stroke-dasharray="4 2"/>`,
     rect(MUG_X, 538, 18, 22, '#bcd2e4', 'rx="3" opacity=".6"'),
     coffee > 0 ? rect(MUG_X + 2, n(558 - coffee), 14, coffee, '#6b4226', 'rx="1.5"') : '',
     `<path d="M${MUG_X} 538v19q0 3 3 3h12q3 0 3-3v-19" stroke="#6f859b" stroke-width="2" fill="none" stroke-linecap="round"/>`,
     `<path d="M${MUG_X + 18} 543q9 1 0 11" stroke="#6f859b" stroke-width="3" fill="none"/>`,
     // The desk lamp: its foot and arm. Its head is drawn above the wash.
-    rect(1212, 554, 30, 6, '#3a3f4b', 'rx="3"'),
-    `<path d="M1227 554l-8-44 22-22" stroke="#3a3f4b" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
+    rect(1212, 554, 30, 6, '#d5dbe6', 'rx="3"'),
+    `<path d="M1227 554l-8-44 22-22" stroke="#d5dbe6" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
   ].join('')
 }
 
@@ -589,8 +589,8 @@ function deskLamp(isOn, isDark) {
 
 function chair() {
   return [
-    rect(1196, 536, 11, 68, '#c22a52', 'rx="5.5"'),
-    rect(1200, 598, 76, 11, '#a51f43', 'rx="5.5"'),
+    rect(1196, 536, 11, 68, '#e8245e', 'rx="5.5"'),
+    rect(1200, 598, 76, 11, '#c4184a', 'rx="5.5"'),
     rect(1235, 609, 6, 46, '#2d3039'),
     `<path d="M1210 668l28-14 28 14" stroke="#2d3039" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="1210" cy="670" r="5" fill="#15171c"/><circle cx="1266" cy="670" r="5" fill="#15171c"/><circle cx="1238" cy="672" r="5" fill="#15171c"/>`,
   ].join('')

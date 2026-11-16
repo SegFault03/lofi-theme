@@ -189,6 +189,26 @@ checkpoint in the app before the next.
   5 below (a permission prompt waiting), which starts with finding the
   engine's event for it in `.claude-plugin/types/claude-code/index.d.ts`.
 
+- Pull request 2 (`live-desk-and-transitions` to `main`) is open:
+  github.com/SegFault03/lofi-theme/pull/2.
+
+- 0.11.4 (committed and pushed to the pull request), the user's five points on the desk side, which
+  looked duller than the lounge at night: the desk lamp's foot and arm
+  are silver (`#d5dbe6`) and the floor lamp's pole brass; the desk is a
+  deeper mahogany (`#7a3318`); the plant is a brighter green in a brown
+  pot; the chair is a stronger shade of the same maroon (`#e8245e`); the
+  monitor's stand is silver and the keyboard light with blue keys. A
+  ticked note is less faded (0.72). 38 tests pass; seen in the preview
+  by day and night.
+
+- Agreed next, after the checkpoints or beside them: show the plugin
+  off. Plan put to the user: a 15 to 20 s hero clip recorded in the app
+  (the user records; a shot list of `/room` commands and one prompt is
+  to be written), a strip of the five phases and feature close-ups
+  rendered from the preview into `docs/` by a small script, a new README
+  top (`docs/room-night.jpg` is stale), a social preview image, a tagged
+  release, then posts. The user has not yet said which part comes first.
+
 Next checkpoints, agreed with the user, in this order:
 1. Done: helpers for subagents.
 2. Done: thinking.
