@@ -258,6 +258,30 @@ checkpoint in the app before the next.
     Not tested: `care` itself, since the test kit has no clock; only its
     two questions and the commands are.
 
+- 0.12.1 (on `care-and-bloom`, committed, not pushed: the user is testing it in the app first): the user asked for the
+  mascot's dash between poses to go. Both of the cast now only fade: the
+  old pose out where it stood, the new one in where it is, over `FADE`
+  (0.7 s, was 0.3). `blend(drawn, old, since)` writes no keyframes any
+  more (`mdash`, `kdash` and the per-move CSS are gone); `MASCOT_SPOT`
+  and `KITTEN_SPOT` only say a pose is known. This replaces what the
+  0.6.0 notes below say about the dash. 42 tests pass.
+
+- 0.12.2 (on `care-and-bloom`, not committed): the user saw the mascot
+  cut, with no fade, from the desk to the couch at a turn's end. The
+  fade was timed from the write (`room.at`), so a draw that reached the
+  app more than `FADE` after it showed only the new pose. Turn end is when
+  the app is busiest. Now `fadeFrom` in `register.tsx` times it from the
+  first draw of each change (module state, no write). A change first
+  drawn more than `LATE_DRAW_MS` (5 s) after its write is taken as old,
+  as after a reload, and is not faded. Each first draw goes to `/room log`
+  as `draw: ... N ms after the write`, so the delay can be read there.
+  Checked: validate passes, 43 tests pass (a new one draws a second
+  late). The user saw it fade in the app after this. They then asked
+  for a faster fade (first read as longer, then corrected): `FADE` is
+  0.5 s (was 0.7), one length for both of the cast. Validate's 8 type warnings on the test file were there before
+  (`prompt.edit`, `CommandRunInput` and others); the new test adds none.
+  43 tests pass. The 0.5 s fade not yet seen in the app.
+
 Next checkpoints, agreed with the user, in this order:
 1. Done: helpers for subagents.
 2. Done: thinking.

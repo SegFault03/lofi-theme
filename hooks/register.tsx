@@ -304,6 +304,28 @@ function logged(what: string): void {
   if (LOG.length > 40) LOG.shift()
 }
 
+// When the latest change of pose was first drawn. The fade is timed from
+// there, not from the write: at a turn's end the app can draw the new room
+// a second after it was written, past the end of a fade timed from the
+// write, and the pose cuts. Kept here, not in $.state, so it costs no write.
+const firstDraw = { at: -1, drawnAt: 0 }
+// A change first drawn later than this is an old one (as after a reload),
+// and is not faded again.
+const LATE_DRAW_MS = 5_000
+
+function fadeFrom(room: Room, now: number): number | undefined {
+  if (room.at === undefined) return undefined
+  if (firstDraw.at !== room.at) {
+    const late = now - room.at
+
+    firstDraw.at = room.at
+    firstDraw.drawnAt = late < LATE_DRAW_MS ? now : room.at
+    logged(`draw: ${room.was?.mascot}, kitten ${room.was?.kitten} to ${room.mascot}, kitten ${room.kitten}, ${late} ms after the write`)
+  }
+
+  return firstDraw.drawnAt
+}
+
 // One at a time. Two that ran together would each read the old state and
 // each write the new one: the same scene drawn twice.
 let roomQueue: Promise<void> = Promise.resolve()
@@ -825,7 +847,7 @@ export const register: Register = (on, options) => {
       const since = Date.now() - 60_000
       const lines = LOG.map(each => `  ${new Date(each.at).toTimeString().slice(0, 8)}  ${each.what}`)
 
-      return { text: [`${LOG.filter(each => each.at > since).length} redraws in the last minute; the last ${LOG.length}:`, ...lines].join('\n') }
+      return { text: [`${LOG.filter(each => each.at > since && !each.what.startsWith('draw:')).length} redraws in the last minute; the last ${LOG.length}:`, ...lines].join('\n') }
     }
     // The chores, on demand. They are moments, not poses: the room is not pinned.
     if (words.length === 1 && (words[0] === 'feed' || words[0] === 'water')) {
@@ -902,6 +924,6 @@ export const register: Register = (on, options) => {
     const alt = `A living room at ${state.phase}: the orange mascot is in its "${state.mascot}" pose${O.hasKitten ? ` and the kitten in its "${state.kitten}" pose` : ''}.`
 
     // The sandboxed frame is where the desktop app plays CSS animation.
-    return <Svg source={buildScene(state, time, look)} alt={alt} isInteractive={e.surface === 'desktop'} />
+    return <Svg source={buildScene({ ...state, at: fadeFrom(state, time.now) }, time, look)}alt={alt} isInteractive={e.surface === 'desktop'} />
   })
 }

@@ -1409,31 +1409,21 @@ const KITTEN_SPOT = {
   prowl: [156, 782 + DROP],
   eat: [244, 752 + DROP],
 }
-const FADE = 0.3
+// One length for both of the cast (seconds).
+const FADE = 0.5
 
 // One of the cast, `since` seconds after it changed pose: the old pose fades
-// where it stood while the new one comes from there, quicker at first. A
-// redraw mid-way goes on from `since`; after the move, only the new pose.
-// Each one-shot ends in the state the drawing has without it (the old pose
-// carries opacity 0), so nothing needs a fill mode and a still surface shows
-// the new pose alone. `id` names the keyframes: letters only.
-function blend(id, drawn, old, from, to, since) {
-  const [dx, dy] = [n(from[0] - to[0]), n(from[1] - to[1])]
-  const far = Math.hypot(dx, dy)
-  const seconds = n(0.4 + far / 2000)
-
-  if (!(since >= 0 && since < seconds)) return { svg: drawn, css: '' }
+// out where it stood while the new one fades in where it is. Neither moves
+// (the user's call: a dash across the room felt rushed). A redraw mid-way
+// goes on from `since`; after the fade, only the new pose. Each one-shot
+// ends in the state the drawing has without it (the old pose carries
+// opacity 0), so nothing needs a fill mode and a still surface shows the
+// new pose alone.
+function blend(drawn, old, since) {
+  if (!(since >= 0 && since < FADE)) return drawn
   const delay = `${Math.round(-since * 100) / 100}s`
-  const ghost = since < FADE ? `<g opacity="0" style="animation:gone ${FADE}s ${delay} linear">${old}</g>` : ''
-  const shown = since < FADE ? `<g style="animation:show ${FADE}s ${delay} linear">${drawn}</g>` : drawn
 
-  if (far === 0) return { svg: ghost + shown, css: '' }
-
-  return {
-    svg: `${ghost}<g style="animation:${id} ${seconds}s ${delay} ease-out">${shown}</g>`,
-    // Held for a moment first: the app takes one to put a new drawing up.
-    css: `@keyframes ${id}{0%,12%{transform:translate(${dx}px,${dy}px)}100%{transform:translate(0px,0px)}}`,
-  }
+  return `<g opacity="0" style="animation:gone ${FADE}s ${delay} linear">${old}</g><g style="animation:show ${FADE}s ${delay} linear">${drawn}</g>`
 }
 
 // A helper for each subagent at work: a small critter on the floor in front
@@ -1449,24 +1439,23 @@ function helpers(count) {
     .join('')
 }
 
-// The two of them, each moving from its last pose where that just changed
-// (`room.was`, at `room.at`; `time.now` is the same clock).
+// The two of them, each fading from its last pose where that just changed
+// (`room.was`, at `room.at`; `time.now` is the same clock). A pose must be
+// in MASCOT_SPOT or KITTEN_SPOT to be faded from or to.
 function castOf(room, time, hasKitten) {
   const since = room.was && room.at !== undefined && time.now !== undefined ? (time.now - room.at) / 1000 : -1
-  const still = svg => ({ svg, css: '' })
   const a =
     since >= 0 && room.was.mascot !== room.mascot && MASCOT_SPOT[room.was.mascot] && MASCOT_SPOT[room.mascot]
-      ? blend('mdash', mascot(room), mascot({ ...room, mascot: room.was.mascot, isWaiting: false }), MASCOT_SPOT[room.was.mascot], MASCOT_SPOT[room.mascot], since)
-      : still(mascot(room))
+      ? blend(mascot(room), mascot({ ...room, mascot: room.was.mascot, isWaiting: false }), since)
+      : mascot(room)
 
-  if (!hasKitten) return a
+  if (!hasKitten) return { svg: a, css: '' }
   const b =
     since >= 0 && room.was.kitten !== room.kitten && KITTEN_SPOT[room.was.kitten] && KITTEN_SPOT[room.kitten]
-      ? // The kitten does not dash (the user's call): it fades out where it was and in where it is.
-        blend('kdash', kitten(room), kitten({ ...room, kitten: room.was.kitten }), KITTEN_SPOT[room.kitten], KITTEN_SPOT[room.kitten], since)
-      : still(kitten(room))
+      ? blend(kitten(room), kitten({ ...room, kitten: room.was.kitten }), since)
+      : kitten(room)
 
-  return { svg: a.svg + b.svg, css: a.css + b.css }
+  return { svg: a + b, css: '' }
 }
 
 // What the desktop app's backdrop frame cannot take (found by taking the
