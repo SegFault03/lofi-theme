@@ -1409,7 +1409,8 @@ const KITTEN_SPOT = {
   prowl: [156, 782 + DROP],
   eat: [244, 752 + DROP],
 }
-const FADE = 0.7
+// One length for both of the cast (seconds).
+const FADE = 0.5
 
 // One of the cast, `since` seconds after it changed pose: the old pose fades
 // out where it stood while the new one fades in where it is. Neither moves

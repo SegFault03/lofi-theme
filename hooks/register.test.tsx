@@ -601,8 +601,8 @@ test('a change of pose is drawn as a slow fade, each pose in its own spot', () =
   const plain = buildScene({ ...base, mascot: 'work', kitten: 'loaf' }, { h: 12, m: 0, s: 0 })
 
   // At once: the old pose fades out on the couch, the new one in at the desk.
-  expect(at(0)).toContain('animation:gone 0.7s 0s linear')
-  expect(at(0)).toContain('animation:show 0.7s 0s linear')
+  expect(at(0)).toContain('animation:gone 0.5s 0s linear')
+  expect(at(0)).toContain('animation:show 0.5s 0s linear')
   // Nothing dashes across the room.
   expect(at(0)).not.toMatch(/mdash|kdash|translate\(-?\d+px,-?\d+px\)\}100%/)
   // The old pose is unseen without the animation, for a surface that draws still.
@@ -610,16 +610,16 @@ test('a change of pose is drawn as a slow fade, each pose in its own spot', () =
   // The kitten kept its pose: one pose fades out, the mascot's.
   expect(at(0).match(/opacity="0"><g class="zl">/g)?.length).toBe(1)
   // Drawn again part of the way in, the fade goes on from there.
-  expect(at(300)).toContain('animation:gone 0.7s -0.3s linear')
-  expect(at(300)).toContain('animation:show 0.7s -0.3s linear')
+  expect(at(300)).toContain('animation:gone 0.5s -0.3s linear')
+  expect(at(300)).toContain('animation:show 0.5s -0.3s linear')
   // After it, and with no clock or no old pose, the room as it is.
-  expect(at(800)).toBe(plain)
+  expect(at(600)).toBe(plain)
   expect(buildScene(room, { h: 12, m: 0, s: 0 })).toBe(plain)
 
   // Both at once: the kitten fades out on the couch and in on its bed.
   const nap = buildScene({ ...base, mascot: 'sleep', kitten: 'sleep', was: { mascot: 'nap', kitten: 'loaf' }, at: 0 }, { h: 12, m: 0, s: 0, now: 100 })
 
-  expect(nap).toContain('animation:gone 0.7s -0.1s linear')
+  expect(nap).toContain('animation:gone 0.5s -0.1s linear')
   expect(nap.match(/opacity="0"><g class="zl">/g)?.length).toBe(2)
   expect(nap).toContain(`translate(300,816)`)
   // No fill mode, and no inline style, in any of it.
@@ -635,7 +635,34 @@ test('the session stores the pose it leaves, once per change', async ($, on) => 
   await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
   await $.classic.UserPromptSubmit({ prompt: 'go' })
   // The mascot is fading in at the desk.
-  expect((await drawn($)).source).toContain('animation:gone 0.7s')
+  expect((await drawn($)).source).toContain('animation:gone 0.5s')
+})
+
+// Real time passing: the test kit has no clock to move.
+const pause = (ms: number) =>
+  new Promise<void>(resolve => (globalThis as unknown as { setTimeout: (go: () => void, ms: number) => void }).setTimeout(resolve, ms))
+
+test('a change first drawn late still fades, timed from that first draw', async ($, on) => {
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  const room = async (args: string) =>
+    ((await $.command.run({ command: 'room', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })) as { text: string }).text
+
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  await room('work')
+  // The app draws the new room a second after the write, as at a turn's end.
+  await pause(1_000)
+  const first = (await drawn($)).source
+
+  expect(first).toContain('animation:gone 0.5s 0s linear')
+  // Drawn again, the fade goes on from the first draw, not from the start.
+  await pause(300)
+  expect((await drawn($)).source).toMatch(/animation:gone 0\.5s -0\.[34]\d?s linear/)
+  // Past the fade, only the new pose.
+  await pause(900)
+  expect((await drawn($)).source).not.toContain('animation:gone')
+  expect(await room('log')).toMatch(/draw: \w+, kitten \w+ to work, kitten \w+, \d+ ms after the write/)
 })
 
 test('a tool call is read for what the desk shows', () => {
