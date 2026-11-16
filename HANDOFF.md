@@ -221,6 +221,9 @@ checkpoint in the app before the next.
   overrides them, and the preview's `&before=1` draws 0.11.4's colours
   for a look side by side. Seen in the preview: by day they stand out;
   at night the plant is hard to tell from the wall. 38 tests pass.
+  0.11.6 (pushed to `main`): the user took the leaves' colour back to
+  0.11.4's green (`#1f9a4c`, `#35c46a`, stems `#1c7a3e`); the chair and
+  the pot keep the new colours.
 
 Next checkpoints, agreed with the user, in this order:
 1. Done: helpers for subagents.

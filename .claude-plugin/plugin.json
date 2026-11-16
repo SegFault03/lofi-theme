@@ -1,6 +1,6 @@
 {
   "name": "lofi-theme",
-  "version": "0.11.5",
+  "version": "0.11.6",
   "description": "A lofi living room behind the chat in the Claude desktop app: the light follows your clock, and an orange mascot and a kitten react to what the session is doing.",
   "author": {
     "name": "SegFault03"

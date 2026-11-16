@@ -534,9 +534,9 @@ const TONES = {
   seat: '#3f0612',
   pot: '#421a05',
   rim: '#57240a',
-  leaf: '#134d08',
-  leafLight: '#1a6410',
-  stem: '#0e3a06',
+  leaf: '#1f9a4c',
+  leafLight: '#35c46a',
+  stem: '#1c7a3e',
 }
 
 function plant(t = TONES) {
