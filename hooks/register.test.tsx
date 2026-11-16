@@ -684,6 +684,12 @@ test('typing between turns perks the mascot up; a tool in hand reaches the desk'
   expect((await drawn($)).source).toContain('animation:pop .4s')
 
   await $.turn.start({ text: 'go', turnId: 't1' })
+  // No tool in hand yet: it thinks, at a dim screen.
+  const thinking = (await drawn($)).source
+
+  expect(thinking).toContain('>thinking')
+  expect(thinking).toContain('fill="#141925"')
+  expect(thinking).not.toContain('animation:type 5s')
   await $.tool.call({ tool: 'Read', file_path: '/work/my-project/scene.js' })
   const { source } = await drawn($)
 

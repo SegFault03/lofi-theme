@@ -567,6 +567,13 @@ function screens(mode, kind) {
   }
   // At work the screen shows the tool in hand; with none, or an edit, code
   // being typed (below).
+  if (mode === 'work' && kind === 'think') {
+    // Nothing on it yet: a dim screen, and three dots that wait.
+    return [
+      rect(x, y, w, h, '#141925', 'rx="3"'),
+      ...[0, 1, 2].map(i => `<circle cx="${x + w / 2 - 12 + i * 12}" cy="${y + h / 2}" r="3.2" fill="#8d97ad" style="animation:tw 1.5s ${n(-i * 0.5)}s infinite"/>`),
+    ].join('')
+  }
   if (mode === 'work' && kind === 'read') {
     const r = rng(11)
 
@@ -802,6 +809,15 @@ function mascot(room) {
       const kind = room.doing?.kind
       const spot = [1350, 600 + DESK_DROP]
 
+      if (kind === 'think') {
+        // Chin on its hand, eyes up, and a thought that has not come yet.
+        const hand = rect(18, -31, 24, 10, ORANGE, 'rx="4" transform="rotate(-38 30 -26)"')
+        const dots = [0, 1, 2]
+          .map(i => `<circle cx="${28 + i * 11}" cy="${-74 - i * 5}" r="${n(2.6 + i * 0.7)}" fill="#fff" style="animation:tw 1.8s ${n(-i * 0.6)}s infinite"/>`)
+          .join('')
+
+        return at(...spot, 3, critter({ look: [5, -6] }) + hand, dots, 'breathe 4.4s ease-in-out infinite')
+      }
       if (kind === 'read') return at(...spot, 0, critter({ look: [8, -3] }), '', 'breathe 3s ease-in-out infinite')
       if (kind === 'shell') return at(...spot, -5, critter({ eyes: 'half', look: [7, 0] }), '', 'breathe 4.2s ease-in-out infinite')
       if (kind === 'web') return at(...spot, 0, critter({ look: [9, 0], arms: 'tapping' }), '', 'breathe 2.4s ease-in-out infinite')

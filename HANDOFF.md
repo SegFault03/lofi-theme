@@ -94,9 +94,22 @@ checkpoint in the app before the next.
   They show whatever the mascot does. Preview: `&helpers=3` (seen at 0.5
   scale; enlarged after, not looked at again). 34 tests pass.
 
+  The user saw two helpers come and go with two Haiku subagents: works.
+  0.5.3 to 0.8.0 are committed on branch `live-desk-and-transitions`
+  (dcc1189), not pushed.
+
+- Checkpoint 3, thinking (0.8.1): in a turn with no tool in hand,
+  `wanted()` gives `doing: { kind: 'think', label: 'thinking' }`, so no
+  timer and no extra redraw: it is what the desk shows at a turn's start
+  and when a tool's look clears. Dim screen with three dots; the mascot
+  rests its chin on a hand under three thought dots. Typing code is now
+  only for an edit (and `/room work`, which has no `doing`). Seen in the
+  preview (`&doing=think`), with the helpers at their new size. 34 tests
+  pass. Not seen in the app.
+
 Next checkpoints, agreed with the user, in this order:
 1. Done: helpers for subagents.
-2. Thinking (in a turn, no tool for a while): chin on hand, dim screen.
+2. Done: thinking.
 3. A failed tool call: screen flashes red, kitten flinches.
 4. Sticky notes as the task list; mug as the context gauge.
 5. A permission prompt waiting: the mascot turns and waves. Needs an

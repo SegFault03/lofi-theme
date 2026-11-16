@@ -27,7 +27,7 @@ export type Fx = 'none' | 'confetti' | 'fireworks'
 export type Wall = 'slate' | 'plum' | 'forest' | 'clay'
 
 /** What the tool in hand is, and a few words for it (`editing scene.js`). */
-export type Doing = { kind: 'read' | 'edit' | 'shell' | 'web'; label: string }
+export type Doing = { kind: 'think' | 'read' | 'edit' | 'shell' | 'web'; label: string }
 
 export type Room = {
   phase: Phase

@@ -191,7 +191,9 @@ function wanted(): Omit<Room, 'isPinned'> {
   const room: Omit<Room, 'isPinned'> = { phase, mascot, kitten, fx, isRaining, isWaiting: isWaiting() }
 
   // The tool in hand shows only while the mascot is at the keyboard.
-  if (mascot === 'work' && S.doing !== undefined) room.doing = S.doing
+  // With none in a turn, it is thinking, or writing its answer.
+  if (mascot === 'work') room.doing = S.doing ?? (S.isInTurn ? { kind: 'think', label: 'thinking' } : undefined)
+  if (room.doing === undefined) delete room.doing
   // A small helper by the desk for each subagent at work.
   if (S.agents.size > 0) room.helpers = Math.min(MOST_HELPERS, S.agents.size)
 
