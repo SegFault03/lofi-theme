@@ -191,7 +191,7 @@ checkpoint in the app before the next.
 
 - Pull request 2 (`live-desk-and-transitions` to `main`,
   github.com/SegFault03/lofi-theme/pull/2): the user asked for it to be
-  merged on 2026-11-17, with 0.11.4 and `docs/video.md` in it. Start the
+  merged on 2026-11-17, with 0.11.4 in it. Start the
   next work on a new branch from `main`.
 
 - 0.11.4 (committed and pushed to the pull request), the user's five points on the desk side, which
@@ -209,10 +209,12 @@ checkpoint in the app before the next.
   to be written), a strip of the five phases and feature close-ups
   rendered from the preview into `docs/` by a small script, a new README
   top (`docs/room-night.jpg` is stale), a social preview image, a tagged
-  release, then posts. First part done: `docs/video.md` has the demo
-  repository's setup (tried: its test passes), the prompt to type, the
-  beats and the extra shots. The user records the take. Still to do: the
-  stills script, the README's top, the release.
+  release, then posts. First part done: a recording guide (the demo
+  repository's setup, the prompt to type, the beats, the extra shots).
+  The user had it taken out of the repository on 2026-11-17: it is now
+  `lofi-theme-video.md` in their Downloads folder, and the showcase
+  material is to stay out of the repository. It is still in the history
+  (commit 8f7d7ca); the user chose a plain delete over a rewrite.
 
 - 0.11.5, pushed straight to `main` on the user's word: colours they
   named for the chair (`#30020c`), the pot (`#421a05`) and the leaves
