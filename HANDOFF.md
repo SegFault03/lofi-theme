@@ -189,8 +189,10 @@ checkpoint in the app before the next.
   5 below (a permission prompt waiting), which starts with finding the
   engine's event for it in `.claude-plugin/types/claude-code/index.d.ts`.
 
-- Pull request 2 (`live-desk-and-transitions` to `main`) is open:
-  github.com/SegFault03/lofi-theme/pull/2.
+- Pull request 2 (`live-desk-and-transitions` to `main`,
+  github.com/SegFault03/lofi-theme/pull/2): the user asked for it to be
+  merged on 2026-11-17, with 0.11.4 and `docs/video.md` in it. Start the
+  next work on a new branch from `main`.
 
 - 0.11.4 (committed and pushed to the pull request), the user's five points on the desk side, which
   looked duller than the lounge at night: the desk lamp's foot and arm
@@ -207,7 +209,10 @@ checkpoint in the app before the next.
   to be written), a strip of the five phases and feature close-ups
   rendered from the preview into `docs/` by a small script, a new README
   top (`docs/room-night.jpg` is stale), a social preview image, a tagged
-  release, then posts. The user has not yet said which part comes first.
+  release, then posts. First part done: `docs/video.md` has the demo
+  repository's setup (tried: its test passes), the prompt to type, the
+  beats and the extra shots. The user records the take. Still to do: the
+  stills script, the README's top, the release.
 
 Next checkpoints, agreed with the user, in this order:
 1. Done: helpers for subagents.
