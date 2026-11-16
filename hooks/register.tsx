@@ -34,7 +34,7 @@ const INITIAL: Room = {
 }
 // Change the tag when Room's fields change: it declines what older code stored.
 const room = atom({ plugin: 'lofi-theme', key: 'room' } as const, INITIAL, {
-  shape: 'room-4',
+  shape: 'room-5',
 })
 // Bumped to have the scene drawn again with the time as it is now: the clock's
 // digits run on the scene's own CSS, which a sleeping machine leaves behind.
@@ -102,7 +102,7 @@ const HELP = [
   '  log: the last redraws of the scene, and when',
 ].join('\n')
 
-type Shown = { mascot: MascotPose; fx: Fx; kitten?: KittenPose }
+type Shown = { mascot: MascotPose; fx: Fx; kitten?: KittenPose; news?: string }
 
 // What the session is doing. Module state starts over on a reload, which is
 // right for it: a reload lands between turns. What is drawn lives in $.state.
@@ -129,6 +129,7 @@ const S = {
   doing: undefined as Doing | undefined,
   nextDoing: undefined as Doing | undefined,
   doingAt: 0,
+  isBrief: false,
   doingTimer: undefined as Timer | undefined,
   // The subagents at work, each with when it was last heard of: one whose
   // end never comes is let go after AGENT_MS.
@@ -194,6 +195,7 @@ function wanted(): Omit<Room, 'isPinned'> {
   // With none in a turn, it is thinking, or writing its answer.
   if (mascot === 'work') room.doing = S.doing ?? (S.isInTurn ? { kind: 'think', label: 'thinking' } : undefined)
   if (room.doing === undefined) delete room.doing
+  if (S.show?.news !== undefined) room.news = S.show.news
   // A small helper by the desk for each subagent at work.
   if (S.agents.size > 0) room.helpers = Math.min(MOST_HELPERS, S.agents.size)
 
@@ -204,15 +206,23 @@ function wanted(): Omit<Room, 'isPinned'> {
 // come several a second and every change is a redraw, so the desk changes at
 // most once in DOING_MS, to the latest; and it keeps a finished call's look
 // for LINGER_MS, in case the next call follows.
-function note($: EngineInterface, doing?: Doing): void {
+function note($: EngineInterface, doing?: Doing, isBrief = false): void {
   S.nextDoing = doing
+  S.isBrief = isBrief
   S.doingTimer?.cancel()
   const show = () => {
     S.doingTimer = undefined
-    if (S.nextDoing?.kind === S.doing?.kind && S.nextDoing?.label === S.doing?.label) return
-    S.doing = S.nextDoing
-    S.doingAt = Date.now()
-    void sync($).catch(() => undefined)
+    if (S.nextDoing?.kind !== S.doing?.kind || S.nextDoing?.label !== S.doing?.label) {
+      S.doing = S.nextDoing
+      S.doingAt = Date.now()
+      void sync($).catch(() => undefined)
+    }
+    // A brief one (a call that failed) has no call to end it: it goes by itself.
+    if (S.isBrief) {
+      S.isBrief = false
+      S.nextDoing = undefined
+      S.doingTimer = $.clock.after(LINGER_MS, show)
+    }
   }
   const wait = Math.max(doing === undefined ? LINGER_MS : 0, DOING_MS - (Date.now() - S.doingAt))
 
@@ -695,21 +705,27 @@ export const register: Register = (on, options) => {
 
       // A git or gh command may have changed the branch, what is committed
       // or the pull request.
-      if (isShell && /(git|gh)/.test(String(input.command ?? ''))) {
+      if (isShell && /\b(git|gh)\b/.test(String(input.command ?? ''))) {
         await scout($)
         await air($)
         void survey($).catch(() => undefined)
       }
 
       if (kind === 'merge' && !hasFailed) {
-        await flash($, { mascot: 'cheer', fx: 'fireworks', kitten: 'startle' }, 25_000)
+        await flash($, { mascot: 'cheer', fx: 'fireworks', kitten: 'startle', news: 'Pull request merged!' }, 25_000)
       } else if (kind === 'commit' && !hasFailed) {
-        await flash($, { mascot: 'cheer', fx: 'confetti' }, 9_000)
+        await flash($, { mascot: 'cheer', fx: 'confetti', news: 'Committed' }, 9_000)
+      } else if (kind === 'pr' && !hasFailed) {
+        await flash($, { mascot: 'cheer', fx: 'confetti', news: 'Pull request opened' }, 9_000)
       } else if (kind === 'test' && !hasFailed) {
-        await flash($, { mascot: 'cheer', fx: 'none' }, 4_000)
+        await flash($, { mascot: 'cheer', fx: 'none', news: 'Tests passed' }, 4_000)
       } else if (kind === 'test') {
-        await flash($, { mascot: 'facepalm', fx: 'none' }, 7_000)
+        await flash($, { mascot: 'facepalm', fx: 'none', news: 'Tests failed' }, 7_000)
       } else {
+        // Any other call that failed: the desk says so for a moment.
+        if (hasFailed && S.isInTurn) {
+          note($, { kind: 'error', label: isShell ? 'command failed' : /^[A-Za-z]{1,16}$/.test(e.tool) ? `${e.tool} failed` : 'a tool failed' }, true)
+        }
         await sync($)
       }
     } catch {

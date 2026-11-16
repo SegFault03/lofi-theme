@@ -10,7 +10,7 @@ export function restPose(
   r: number,
 ): MascotPose
 export function kittenPose(phase: Phase, r: number): KittenPose
-export function classify(command: unknown): 'merge' | 'commit' | 'test' | null
+export function classify(command: unknown): 'merge' | 'commit' | 'pr' | 'test' | null
 export function isRainyDay(dayNumber: number): boolean
 export function activityOf(tool: unknown, input?: unknown): Doing | undefined
 

@@ -27,7 +27,7 @@ export type Fx = 'none' | 'confetti' | 'fireworks'
 export type Wall = 'slate' | 'plum' | 'forest' | 'clay'
 
 /** What the tool in hand is, and a few words for it (`editing scene.js`). */
-export type Doing = { kind: 'think' | 'read' | 'edit' | 'shell' | 'web'; label: string }
+export type Doing = { kind: 'think' | 'error' | 'read' | 'edit' | 'shell' | 'web'; label: string }
 
 export type Room = {
   phase: Phase
@@ -41,6 +41,8 @@ export type Room = {
   isPinned: boolean
   /** The tool in hand while the mascot works: the monitor and the ticker show it. */
   doing?: Doing
+  /** A word for the moment being shown (`Tests passed`): it leads the TV's ticker. */
+  news?: string
   /** How many subagents are at work, up to three: a small helper by the desk for each. */
   helpers?: number
   /** The poses before the last change of pose, and when that was (ms): the scene draws the move. */

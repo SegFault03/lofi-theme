@@ -107,10 +107,28 @@ checkpoint in the app before the next.
   preview (`&doing=think`), with the helpers at their new size. 34 tests
   pass. Not seen in the app.
 
+- Checkpoint 4 (0.9.0), not seen in the app:
+  - The ticker says what a moment is: `Shown.news`, stored as `Room.news`
+    (shape `room-5`), leads the ticker for as long as the moment shows:
+    `Tests passed`, `Tests failed`, `Committed`, `Pull request merged!`,
+    and new `Pull request opened` (`classify` gives `pr` for
+    `gh pr create`; confetti, 9 s).
+  - A tool call that failed, other than a test: `doing` of kind `error`
+    (`command failed`, `Read failed`, `a tool failed`), a red screen with
+    a warning sign, the mascot wide-eyed. `note(..., true)` is brief: it
+    clears itself after `LINGER_MS`. The kitten does not flinch (its
+    `startle` pose is on the sill, which would move it).
+  - Found: the test in `tool.call` for a git or gh command held two
+    backspace characters where `\b` was meant (since 0.5.2), so it never
+    matched: the branch, the diff and the pull request were not read
+    again after a git command, only at the next prompt. Now `\b`. Beware
+    of writing `\b` through a script: check with `grep -c $'\x08'`.
+  - 35 tests pass; the error screen seen in the preview (`&doing=error`).
+
 Next checkpoints, agreed with the user, in this order:
 1. Done: helpers for subagents.
 2. Done: thinking.
-3. A failed tool call: screen flashes red, kitten flinches.
+3. Done: a failed tool call (no kitten flinch).
 4. Sticky notes as the task list; mug as the context gauge.
 5. A permission prompt waiting: the mascot turns and waves. Needs an
    engine event for it; not looked up yet.

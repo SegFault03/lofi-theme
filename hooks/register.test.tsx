@@ -747,6 +747,39 @@ test('each subagent at work has a helper by the desk, three at most', async ($, 
   expect(lids((await drawn($)).source)).toBe(1)
 })
 
+test('the ticker says what the moment is, and a failed call shows on the desk', async ($, on) => {
+  let isFailing = false
+
+  on('command.register', () => ({ value: { command: 'room' } }))
+  on('theme.set', () => ({ value: { isDrawn: true, requestId: 'backdrop' } }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('tool.call', () => (isFailing ? { result: {}, isError: true } : { result: {} }))
+
+  expect(classify('gh pr create --fill')).toBe('pr')
+  await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'go', turnId: 't1' })
+
+  await $.tool.call({ tool: 'Bash', command: 'npm test' })
+  expect((await drawn($)).source).toContain('>Tests passed')
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m "x"' })
+  expect((await drawn($)).source).toContain('>Committed')
+  await $.tool.call({ tool: 'Bash', command: 'gh pr create --fill' })
+  expect((await drawn($)).source).toContain('>Pull request opened')
+  await $.tool.call({ tool: 'Bash', command: 'gh pr merge 7' })
+  expect((await drawn($)).source).toContain('>Pull request merged!')
+  isFailing = true
+  await $.tool.call({ tool: 'Bash', command: 'npm test' })
+  expect((await drawn($)).source).toContain('>Tests failed')
+
+  // The words stand alone in the scene too.
+  const room = { phase: 'day', mascot: 'work', kitten: 'loaf', fx: 'none', isRaining: false, isWaiting: false } as const
+  const failed = buildScene({ ...room, doing: { kind: 'error', label: 'Read failed' } }, undefined, { tv: { project: 'p', chat: 'c', feed: [] } })
+
+  expect(failed).toContain('>Read failed')
+  expect(failed).toContain('fill="#2a1418"')
+})
+
 test('the project follows the session to another folder', async ($, on) => {
   let folder = '/tmp/spare-3ASnlA'
 

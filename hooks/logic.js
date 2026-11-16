@@ -66,16 +66,18 @@ export function kittenPose(phase, r) {
 }
 
 const MERGE = /\bgh\s+pr\s+merge\b/
+const OPENED = /\bgh\s+pr\s+create\b/
 const COMMIT = /\bgit\s+(-\S+\s+\S+\s+)*commit\b/
 const TEST =
   /\b((npm|pnpm|yarn|bun)\s+(run\s+)?test|npx\s+(jest|vitest|playwright)|pytest|jest|vitest|cargo\s+test|go\s+test|dotnet\s+test|mvn\s+test|gradlew?(\.bat)?\s+\S*test|claude\s+plugin\s+test)\b/i
 
-/** What a shell command means to the room: `merge`, `commit`, `test` or null. */
+/** What a shell command means to the room: `merge`, `commit`, `pr` (one opened), `test` or null. */
 export function classify(command) {
   if (typeof command !== 'string') return null
   // Commit first: a commit message may mention a merge.
   if (COMMIT.test(command)) return 'commit'
   if (MERGE.test(command)) return 'merge'
+  if (OPENED.test(command)) return 'pr'
   if (TEST.test(command)) return 'test'
   return null
 }

@@ -574,6 +574,13 @@ function screens(mode, kind) {
       ...[0, 1, 2].map(i => `<circle cx="${x + w / 2 - 12 + i * 12}" cy="${y + h / 2}" r="3.2" fill="#8d97ad" style="animation:tw 1.5s ${n(-i * 0.5)}s infinite"/>`),
     ].join('')
   }
+  if (mode === 'work' && kind === 'error') {
+    // A call that failed: a red screen and a warning sign.
+    return [
+      rect(x, y, w, h, '#2a1418', 'rx="3"'),
+      `<g style="animation:pulse 1s infinite"><path d="M${x + w / 2} ${y + 14}l22 40h-44Z" fill="none" stroke="#ff5d73" stroke-width="5" stroke-linejoin="round"/><path d="M${x + w / 2} ${y + 30}v11M${x + w / 2} ${y + 47}v.5" stroke="#ff5d73" stroke-width="5" stroke-linecap="round"/></g>`,
+    ].join('')
+  }
   if (mode === 'work' && kind === 'read') {
     const r = rng(11)
 
@@ -818,6 +825,7 @@ function mascot(room) {
 
         return at(...spot, 3, critter({ look: [5, -6] }) + hand, dots, 'breathe 4.4s ease-in-out infinite')
       }
+      if (kind === 'error') return at(...spot, 0, critter({ eyes: 'wide', look: [7, -1] }), '', 'shake .5s 3')
       if (kind === 'read') return at(...spot, 0, critter({ look: [8, -3] }), '', 'breathe 3s ease-in-out infinite')
       if (kind === 'shell') return at(...spot, -5, critter({ eyes: 'half', look: [7, 0] }), '', 'breathe 4.2s ease-in-out infinite')
       if (kind === 'web') return at(...spot, 0, critter({ look: [9, 0], arms: 'tapping' }), '', 'breathe 2.4s ease-in-out infinite')
@@ -1416,7 +1424,7 @@ export function buildScene(room, time = { h: 12, m: 0, s: 0 }, look = {}) {
     `<g class="zr"><g transform="${DESK}">${desk()}<g transform="translate(72,0)">${chair()}</g></g>${shelf()}${clockCase()}${look.tv ? tvCase() : poster()}</g>`,
     wash,
     `<g class="zl">${left.join('')}</g>`,
-    `<g class="zr"><g transform="${DESK}">${right.join('')}${screens(screenMode, room.doing?.kind)}${deskLamp(isSteamy, dim > 0.2)}<rect x="1468" y="598" width="6" height="68" rx="3" fill="#ff3d7f" style="animation:pulse 2.4s infinite"/>${steam}</g>${clockFace(time, look.clock)}${look.tv ? tvFace(look.tv, room.mascot === 'work' ? room.doing : undefined) : ''}</g>`,
+    `<g class="zr"><g transform="${DESK}">${right.join('')}${screens(screenMode, room.doing?.kind)}${deskLamp(isSteamy, dim > 0.2)}<rect x="1468" y="598" width="6" height="68" rx="3" fill="#ff3d7f" style="animation:pulse 2.4s infinite"/>${steam}</g>${clockFace(time, look.clock)}${look.tv ? tvFace(look.tv, room.news ? { label: room.news } : room.mascot === 'work' ? room.doing : undefined) : ''}</g>`,
     cast,
     room.fx === 'confetti' ? confetti() : '',
     '</svg>',
