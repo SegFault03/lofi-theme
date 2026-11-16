@@ -1,4 +1,4 @@
-import type { Doing, KittenPose, MascotPose, Phase, PrState, Screen } from '../types'
+import type { Bloom, Doing, KittenPose, MascotPose, Phase, PrState, Screen } from '../types'
 
 export const PHASES: readonly Phase[]
 export const MASCOT_POSES: readonly MascotPose[]
@@ -49,3 +49,9 @@ export const MOST_NOTES: number
 export function tasksAfter(tasks: readonly Task[], tool: unknown, input?: unknown, result?: unknown): Task[]
 export function notesOf(tasks: readonly Task[]): string | undefined
 export function cupOf(percent: unknown): number | undefined
+export const FEED_MS: number
+export function isFeedingTime(now: number, fedAt?: unknown): boolean
+export function isWateringTime(now: number, wateredAt?: unknown): boolean
+export const BLOOMS: readonly Bloom[]
+export function bloomAt(dayNumber: number): Bloom
+export function localDay(now: number): number

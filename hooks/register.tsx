@@ -10,6 +10,10 @@ import {
   folderName,
   prFacts,
   activityOf,
+  bloomAt,
+  isFeedingTime,
+  isWateringTime,
+  localDay,
   isRainyDay,
   KITTEN_POSES,
   kittenPose,
@@ -37,7 +41,7 @@ const INITIAL: Room = {
 }
 // Change the tag when Room's fields change: it declines what older code stored.
 const room = atom({ plugin: 'lofi-theme', key: 'room' } as const, INITIAL, {
-  shape: 'room-6',
+  shape: 'room-7',
 })
 // Bumped to have the scene drawn again with the time as it is now: the clock's
 // digits run on the scene's own CSS, which a sleeping machine leaves behind.
@@ -95,17 +99,21 @@ const AGENT_MS = 15 * 60_000 // a subagent not heard of this long is taken to be
 const MOST_HELPERS = 3 // the floor by the desk has room for this many
 const IDLE_MS = 10 * 60_000 // quiet this long and the mascot follows the clock
 const TICK_MS = 60_000
+const FEED_SHOWN_MS = 14_000 // how long a meal is on show
+const WATER_SHOWN_MS = 11_000 // and a watering
 const HELP = [
   'Usage: /room <what>',
   `  time of day: ${PHASES.join(', ')}`,
   `  mascot: ${MASCOT_POSES.join(', ')}`,
   `  kitten: ${KITTEN_POSES.map(pose => `kitten-${pose}`).join(', ')}`,
   '  extras: fireworks, confetti, rain, clear',
+  '  care: feed (the kitten), water (the plant), each by itself',
   '  auto: let the session drive the room again',
   '  log: the last redraws of the scene, and when',
 ].join('\n')
 
-type Shown = { mascot: MascotPose; fx: Fx; kitten?: KittenPose; news?: string }
+// `isCare`: a chore, not news of the session; a turn that starts cuts it short.
+type Shown = { mascot: MascotPose; fx: Fx; kitten?: KittenPose; news?: string; isCare?: boolean }
 
 // What the session is doing. Module state starts over on a reload, which is
 // right for it: a reload lands between turns. What is drawn lives in $.state.
@@ -139,6 +147,10 @@ const S = {
   agents: new Map<string, number>(),
   // The session's task list, as the tool calls that write it have left it.
   tasks: [] as Task[],
+  // When the kitten was last fed and the plant last watered (ms), as the
+  // store has them: they hold across sessions.
+  fedAt: undefined as number | undefined,
+  wateredAt: undefined as number | undefined,
 }
 
 // What the session has told us for the TV. It starts over on a reload; the
@@ -209,6 +221,10 @@ function wanted(): Omit<Room, 'isPinned'> {
 
   if (notes !== undefined) room.notes = notes
   if (cup !== undefined) room.cup = cup
+  // The plant's week of flowers goes by the calendar.
+  const bloom = bloomAt(localDay(Date.now()))
+
+  if (bloom !== 'none') room.bloom = bloom
 
   return room
 }
@@ -450,7 +466,7 @@ async function tune($: EngineInterface, cwd: string): Promise<void> {
 
 // A moment that passes by itself: a cheer, a facepalm, the fireworks.
 function flash($: EngineInterface, shown: Shown, ms: number): Promise<void> {
-  if (!O.hasCelebrations) return sync($)
+  if (!O.hasCelebrations && shown.isCare !== true) return sync($)
   S.showTimer?.cancel()
   S.show = shown
   S.showTimer = $.clock.after(ms, () => {
@@ -459,6 +475,35 @@ function flash($: EngineInterface, shown: Shown, ms: number): Promise<void> {
   })
 
   return sync($)
+}
+
+// Feeds the kitten or waters the plant: notes when, for this session and
+// the next, and shows it for a while.
+async function tend($: EngineInterface, chore: 'feed' | 'water'): Promise<void> {
+  const now = Date.now()
+
+  if (chore === 'feed') {
+    S.fedAt = now
+    void $.store.set('fedAt', now).catch(() => undefined)
+    await flash($, { mascot: 'feed', fx: 'none', kitten: 'eat', news: 'Feeding the kitten', isCare: true }, FEED_SHOWN_MS)
+  } else {
+    S.wateredAt = now
+    void $.store.set('wateredAt', now).catch(() => undefined)
+    await flash($, { mascot: 'water', fx: 'none', news: 'Watering the plant', isCare: true }, WATER_SHOWN_MS)
+  }
+}
+
+// The chores, looked at once a minute and done in a quiet moment: the plant
+// once a day while it is light, the kitten when it has not eaten today or
+// for two hours. Never in a turn, over another moment, asleep, or in a room
+// the person has posed.
+async function care($: EngineInterface): Promise<void> {
+  if (S.isInTurn || S.show !== undefined || S.isNoticing || S.rest === 'sleep') return
+  if ((await read($, room)).isPinned) return
+  const now = Date.now()
+
+  if (isWateringTime(now, S.wateredAt)) await tend($, 'water')
+  else if (O.hasKitten && isFeedingTime(now, S.fedAt)) await tend($, 'feed')
 }
 
 export const register: Register = (on, options) => {
@@ -475,6 +520,12 @@ export const register: Register = (on, options) => {
     await dress($).catch(() => undefined)
     // The mug wants the context's fill, with or without the TV.
     await gauge($).catch(() => undefined)
+    // When the chores were last done, in an earlier session perhaps.
+    const fedAt = await $.store.get('fedAt').catch(() => undefined)
+    const wateredAt = await $.store.get('wateredAt').catch(() => undefined)
+
+    if (typeof fedAt === 'number') S.fedAt = fedAt
+    if (typeof wateredAt === 'number') S.wateredAt = wateredAt
     rollRest()
     rollPet()
     await sync($)
@@ -513,6 +564,7 @@ export const register: Register = (on, options) => {
         if ((idle === 'sleep') !== (S.rest === 'sleep')) S.rest = idle
       }
       void sync($)
+      void care($).catch(() => undefined)
       // Nothing is polled: the figures come by `session.measure`, the branch
       // with prompts and git commands. Only a project's name that is still
       // missing is asked for again, until it is there. A merged request is
@@ -626,6 +678,11 @@ export const register: Register = (on, options) => {
         S.noticeTimer?.cancel()
         S.hasBackgroundWork = false
         S.lastActiveAt = Date.now()
+        // Work comes first: a chore on show is cut short.
+        if (S.show?.isCare === true) {
+          S.showTimer?.cancel()
+          S.show = undefined
+        }
         // A list all done has had its turn on the shelf.
         if (S.tasks.every(each => each.mark === 'd')) S.tasks = []
         // The kitten likes a warm desk.
@@ -769,6 +826,16 @@ export const register: Register = (on, options) => {
       const lines = LOG.map(each => `  ${new Date(each.at).toTimeString().slice(0, 8)}  ${each.what}`)
 
       return { text: [`${LOG.filter(each => each.at > since).length} redraws in the last minute; the last ${LOG.length}:`, ...lines].join('\n') }
+    }
+    // The chores, on demand. They are moments, not poses: the room is not pinned.
+    if (words.length === 1 && (words[0] === 'feed' || words[0] === 'water')) {
+      if (words[0] === 'feed' && !O.hasKitten) return { text: 'There is no kitten to feed: the kitten option is off.' }
+      S.showTimer?.cancel()
+      S.show = undefined
+      await update($, room, current => ({ ...current, isPinned: false }))
+      await tend($, words[0])
+
+      return { text: words[0] === 'feed' ? 'The kitten is fed.' : 'The plant is watered.' }
     }
     if (words.includes('auto')) {
       S.show = undefined

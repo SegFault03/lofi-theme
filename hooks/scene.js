@@ -539,7 +539,30 @@ const TONES = {
   stem: '#1c7a3e',
 }
 
-function plant(t = TONES) {
+// One small flower, or a bud, at a leaf's tip.
+function flower(x, y, r, petal, heart) {
+  if (heart === undefined) return `<circle cx="${x}" cy="${y}" r="${r}" fill="${petal}"/>`
+
+  return `${[
+    [0, -1],
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+  ]
+    .map(([dx, dy]) => `<circle cx="${n(x + dx * r * 0.8)}" cy="${n(y + dy * r * 0.8)}" r="${n(r * 0.7)}" fill="${petal}"/>`)
+    .join('')}<circle cx="${x}" cy="${y}" r="${n(r * 0.55)}" fill="${heart}"/>`
+}
+
+// The plant on the desk. Its week goes by `bloom`: buds, small flowers,
+// full ones, wilted ones, then petals on the desk.
+// The kitten's bowl, on the rug.
+const BOWL = [198, 752 + 60]
+
+function bowl() {
+  return `<g transform="translate(${BOWL[0]},${BOWL[1]})"><path d="M-17-11h34l-5 11h-24Z" fill="#6ecbff"/><rect x="-18" y="-13" width="36" height="4" rx="2" fill="#a9e0ff"/></g>`
+}
+
+function plant(t = TONES, bloom = 'none') {
   const leaves = [
     [-38, -46, -40],
     [-14, -72, -14],
@@ -548,13 +571,28 @@ function plant(t = TONES) {
     [-26, -22, -62],
     [28, -20, 62],
   ]
+  const tips = (which, draw) => which.map(i => draw(leaves[i][0] * 1.25, leaves[i][1] * 1.25 - 4)).join('')
+  const flowers =
+    bloom === 'bud'
+      ? tips([1, 2, 3], (x, y) => flower(x, y, 6, '#ff6f91'))
+      : bloom === 'small'
+        ? tips([1, 2, 3], (x, y) => flower(x, y, 8, '#ff9dbb', '#ffd23f'))
+        : bloom === 'full'
+          ? tips([0, 1, 2, 3, 5], (x, y) => flower(x, y, 12, '#ff7fa8', '#ffd23f'))
+          : bloom === 'wilt'
+            ? tips([1, 2, 3], (x, y) => flower(x, y + 8, 8, '#b58a7c', '#8a6a4a'))
+            : ''
+  const fallen =
+    bloom === 'fallen' || bloom === 'wilt'
+      ? [-44, -34, 38, 50].map((x, i) => `<ellipse cx="${x}" cy="62" rx="7" ry="3.5" fill="#d99aa8" transform="rotate(${i * 40 - 30} ${x} 62)"/>`).join('')
+      : ''
 
   return `<g transform="translate(1512,527) scale(.5)"><g class="f" style="animation:leaf 8s infinite">${leaves
     .map(
       ([x, y, turn], i) =>
         `<path d="M0 0L${x} ${y}" stroke="${t.stem}" stroke-width="3"/><ellipse cx="${x}" cy="${y}" rx="13" ry="24" fill="${i % 2 ? t.leafLight : t.leaf}" transform="rotate(${turn} ${x} ${y})"/>`,
     )
-    .join('')}</g><path d="M-24 0h48l-6 66h-36Z" fill="${t.pot}"/><rect x="-27" y="-4" width="54" height="10" rx="3" fill="${t.rim}"/></g>`
+    .join('')}${flowers}</g>${fallen}<path d="M-24 0h48l-6 66h-36Z" fill="${t.pot}"/><rect x="-27" y="-4" width="54" height="10" rx="3" fill="${t.rim}"/></g>`
 }
 
 // Where the one screen is: its picture, inside the bezel.
@@ -894,6 +932,31 @@ function mascot(room) {
       )
     case 'play':
       return at(168, 748 + DROP, 0, critter({ eyes: 'happy', look: [5, 0], arms: 'stick' }))
+    case 'feed':
+      // Shaking a bag of food over the bowl.
+      return at(
+        ...MASCOT_SPOT.feed,
+        0,
+        critter({ eyes: 'happy', look: [6, 3], arms: 'hold' }) +
+          rect(30, -46, 20, 10, ORANGE, 'rx="4" transform="rotate(-20 32 -41)"') +
+          `<g transform="translate(60,-58) rotate(48)"><g class="c" style="animation:shake .4s infinite">${rect(-12, -17, 24, 34, '#e85d75', 'rx="3"')}${rect(-12, -5, 24, 9, '#ffd166')}</g></g>`,
+        [0, 1, 2]
+          .map(i => `<circle cx="${72 + i * 4}" cy="-40" r="2.6" fill="#8a5a2b" opacity="0" style="animation:cool .9s ${n(i * 0.3)}s infinite"/>`)
+          .join(''),
+      )
+    case 'water':
+      // On a step stool by the desk, tipping a can over the plant.
+      return at(
+        ...MASCOT_SPOT.water,
+        0,
+        critter({ look: [7, -3], arms: 'hold' }) +
+          rect(30, -58, 22, 10, ORANGE, 'rx="4" transform="rotate(-32 32 -53)"') +
+          `<g transform="translate(58,-76) rotate(26)">${rect(-12, -10, 24, 20, '#6ecbff', 'rx="3"')}<path d="M-12-5q-10 5 0 11" stroke="#6ecbff" stroke-width="3" fill="none"/><path d="M12 2l20-12" stroke="#6ecbff" stroke-width="4" stroke-linecap="round"/></g>`,
+        `<path d="M-22 0l-8 94M22 0l8 94" stroke="#a8843f" stroke-width="5" stroke-linecap="round"/>${rect(-29, 0, 58, 7, '#c9a55a', 'rx="2"')}${rect(-33, 46, 66, 6, '#c9a55a', 'rx="2"')}` +
+          [0, 1, 2]
+            .map(i => `<path d="M${88 + i * 4} -72q-3 5 0 8q3-3 0-8Z" fill="#9fd8ff" opacity="0" style="animation:cool 1s ${n(i * 0.33)}s infinite"/>`)
+            .join(''),
+      )
     case 'cheer':
       return at(
         200,
@@ -1009,6 +1072,10 @@ function kitten(room) {
       })
     case 'pounce':
       return at(228, 752 + DROP, catStanding({ isSwiping: true }), { turn: -30, motion: 'hop .7s infinite' })
+    case 'eat':
+      // At the bowl, facing it, head down. The turn is the group's own
+      // attribute, about its feet: nothing is flipped about a moving box.
+      return `<g class="zl"><ellipse cx="${BOWL[0]}" cy="${BOWL[1] - 12}" rx="13" ry="5" fill="#8a5a2b"/><g transform="translate(${KITTEN_SPOT.eat[0]},${KITTEN_SPOT.eat[1]}) scale(-1,1) rotate(13)"><g style="animation:bob .5s infinite">${catStanding({})}</g></g></g>`
     case 'prowl':
       // The turn is about the feet (the group's own origin), not `.c`: the
       // middle of the box moves with the tail and the legs, and a turn about
@@ -1328,6 +1395,8 @@ const MASCOT_SPOT = {
   facepalm: [1320, 600 + DESK_DROP],
   play: [168, 748 + DROP],
   cheer: [200, 748 + DROP],
+  feed: [120, 752 + DROP],
+  water: [1474, 580 + DESK_DROP],
 }
 const KITTEN_SPOT = {
   loaf: [329, 592 + DROP],
@@ -1338,6 +1407,7 @@ const KITTEN_SPOT = {
   yarn: [168, 806 + DROP],
   pounce: [228, 752 + DROP],
   prowl: [156, 782 + DROP],
+  eat: [244, 752 + DROP],
 }
 const FADE = 0.3
 
@@ -1480,7 +1550,7 @@ export function buildScene(room, time = { h: 12, m: 0, s: 0 }, look = {}) {
     `<g class="zl"><g transform="${WINDOW}">${outside(room, L)}${windowFrame(L)}</g></g>`,
     wash,
     // The furniture stands over the wash, in the hour's own light.
-    shaded(`<g class="zl">${rug()}<g transform="${LOUNGE}">${lamp(isLampOn)}${couch()}</g>${airCase()}${catBed()}</g><g class="zr"><g transform="${DESK}">${desk(room.cup)}${plant(tones)}<g transform="translate(42,0)">${chair(tones)}</g></g>${shelf(room.notes)}${clockCase()}${look.tv ? tvCase() : poster()}</g>`, props),
+    shaded(`<g class="zl">${rug()}<g transform="${LOUNGE}">${lamp(isLampOn)}${couch()}</g>${airCase()}${catBed()}${hasKitten ? bowl() : ''}</g><g class="zr"><g transform="${DESK}">${desk(room.cup)}${plant(tones, room.bloom)}<g transform="translate(42,0)">${chair(tones)}</g></g>${shelf(room.notes)}${clockCase()}${look.tv ? tvCase() : poster()}</g>`, props),
     `<g class="zl">${left.join('')}</g>`,
     `<g class="zr"><g transform="${DESK}">${right.join('')}${screens(screenMode, room.doing?.kind)}${deskLamp(isSteamy, dim > 0.2)}<rect x="1468" y="598" width="6" height="68" rx="3" fill="#ff3d7f" style="animation:pulse 2.4s infinite"/>${steam}</g>${clockFace(time, look.clock)}${look.tv ? tvFace(look.tv, room.news ? { label: room.news } : room.mascot === 'work' ? room.doing : undefined) : ''}</g>`,
     cast,

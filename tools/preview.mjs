@@ -29,6 +29,8 @@ function page(query) {
     // &notes=ddappp for a task list (done, in hand, pending); &cup=2 for a half-drunk mug.
     notes: query.get('notes') ?? undefined,
     cup: query.has('cup') ? number('cup', 4) : undefined,
+    // &bloom=bud (small, full, wilt, fallen) for the plant's week; &mascot=feed&kitten=eat and &mascot=water for the care.
+    bloom: query.get('bloom') ?? undefined,
     // &from=phone,loaf for the poses it just left: each load plays the move.
     // &since=0.5 for a drawing that many seconds into it.
     was: query.has('from') ? { mascot: query.get('from').split(',')[0], kitten: query.get('from').split(',')[1] ?? (query.get('kitten') ?? 'loaf') } : undefined,

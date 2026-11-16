@@ -23,6 +23,11 @@ session is doing.
   tick on each one done, a flutter and a red pin for the one in hand.
 - **A mug for the context.** The coffee goes down as the context window
   fills, and an empty mug stops steaming.
+- **Chores.** In a quiet moment the mascot feeds the kitten (when it has
+  not eaten today, or for two hours) and waters the plant (once a day, in
+  the morning or the afternoon). Never while Claude is working.
+- **A plant that flowers.** Over a week it buds, blooms, wilts and drops
+  its petals, then starts again.
 - **A kitten** with a life of its own: the windowsill, the yarn, the warm desk.
 - **The chat is untouched.** The room sits at the two sides of the window;
   nothing is drawn behind or over the conversation.
@@ -108,6 +113,9 @@ or for trying a look:
 
 `/room` alone lists every word it knows. `/room auto` hands the room back to
 the session.
+
+`/room feed` and `/room water` do a chore now. They are moments, not poses:
+the room is not pinned, and the next meal or watering is counted from them.
 
 ## Good to know
 
