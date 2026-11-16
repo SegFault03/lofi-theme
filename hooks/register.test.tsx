@@ -594,35 +594,33 @@ test('a scene drawn again goes on from where its loops were', () => {
   expect(at(0)).not.toMatch(/class="c[^"]*"[^>]*><ellipse cx="0" cy="-16" rx="20"/)
 })
 
-test('a change of pose is drawn as a move from the old spot', () => {
+test('a change of pose is drawn as a slow fade, each pose in its own spot', () => {
   const base = { phase: 'day', fx: 'none', isRaining: false, isWaiting: false } as const
   const room = { ...base, mascot: 'work', kitten: 'loaf', was: { mascot: 'phone', kitten: 'loaf' }, at: 1_000_000 } as const
   const at = (ms: number) => buildScene(room, { h: 12, m: 0, s: 0, now: 1_000_000 + ms })
   const plain = buildScene({ ...base, mascot: 'work', kitten: 'loaf' }, { h: 12, m: 0, s: 0 })
 
-  // At once: the old pose fades where it stood, the new one dashes from there.
-  expect(at(0)).toContain('@keyframes mdash{0%,12%{transform:translate(-1148px,-10px)}100%{transform:translate(0px,0px)}}')
-  expect(at(0)).toContain('animation:mdash 1s 0s ease-out')
-  expect(at(0)).toContain('animation:gone 0.3s 0s linear')
+  // At once: the old pose fades out on the couch, the new one in at the desk.
+  expect(at(0)).toContain('animation:gone 0.7s 0s linear')
+  expect(at(0)).toContain('animation:show 0.7s 0s linear')
+  // Nothing dashes across the room.
+  expect(at(0)).not.toMatch(/mdash|kdash|translate\(-?\d+px,-?\d+px\)\}100%/)
   // The old pose is unseen without the animation, for a surface that draws still.
   expect(at(0)).toMatch(/<g class="s\d+" opacity="0"><g class="zl">/)
-  // The kitten kept its pose: it does not move.
-  expect(at(0)).not.toContain('kdash')
-  // Drawn again half a second in, the dash goes on; the fade is over.
-  expect(at(500)).toContain('animation:mdash 1s -0.5s ease-out')
-  expect(at(500)).not.toContain('animation:gone')
-  // After the move, and with no clock or no old pose, the room as it is.
-  expect(at(1500)).toBe(plain)
+  // The kitten kept its pose: one pose fades out, the mascot's.
+  expect(at(0).match(/opacity="0"><g class="zl">/g)?.length).toBe(1)
+  // Drawn again part of the way in, the fade goes on from there.
+  expect(at(300)).toContain('animation:gone 0.7s -0.3s linear')
+  expect(at(300)).toContain('animation:show 0.7s -0.3s linear')
+  // After it, and with no clock or no old pose, the room as it is.
+  expect(at(800)).toBe(plain)
   expect(buildScene(room, { h: 12, m: 0, s: 0 })).toBe(plain)
 
-  // Two poses on one spot only fade into each other.
+  // Both at once: the kitten fades out on the couch and in on its bed.
   const nap = buildScene({ ...base, mascot: 'sleep', kitten: 'sleep', was: { mascot: 'nap', kitten: 'loaf' }, at: 0 }, { h: 12, m: 0, s: 0, now: 100 })
 
-  expect(nap).not.toContain('mdash')
-  expect(nap).toContain('animation:show 0.3s -0.1s linear')
-  // The kitten never dashes: it fades out on the couch and in on its bed.
-  expect(nap).not.toContain('kdash')
-  expect(nap.match(/animation:gone 0\.3s -0\.1s linear/g)?.length).toBe(1)
+  expect(nap).toContain('animation:gone 0.7s -0.1s linear')
+  expect(nap.match(/opacity="0"><g class="zl">/g)?.length).toBe(2)
   expect(nap).toContain(`translate(300,816)`)
   // No fill mode, and no inline style, in any of it.
   expect(at(0)).not.toMatch(/\sstyle="|forwards|backwards|both/)
@@ -636,8 +634,8 @@ test('the session stores the pose it leaves, once per change', async ($, on) => 
 
   await $.session.start({ cwd: '/work/my-project', surface: 'desktop', isInteractive: true })
   await $.classic.UserPromptSubmit({ prompt: 'go' })
-  // The mascot is on its way to the desk.
-  expect((await drawn($)).source).toContain('@keyframes mdash')
+  // The mascot is fading in at the desk.
+  expect((await drawn($)).source).toContain('animation:gone 0.7s')
 })
 
 test('a tool call is read for what the desk shows', () => {

@@ -258,6 +258,14 @@ checkpoint in the app before the next.
     Not tested: `care` itself, since the test kit has no clock; only its
     two questions and the commands are.
 
+- 0.12.1 (on `care-and-bloom`, committed, not pushed: the user is testing it in the app first): the user asked for the
+  mascot's dash between poses to go. Both of the cast now only fade: the
+  old pose out where it stood, the new one in where it is, over `FADE`
+  (0.7 s, was 0.3). `blend(drawn, old, since)` writes no keyframes any
+  more (`mdash`, `kdash` and the per-move CSS are gone); `MASCOT_SPOT`
+  and `KITTEN_SPOT` only say a pose is known. This replaces what the
+  0.6.0 notes below say about the dash. 42 tests pass.
+
 Next checkpoints, agreed with the user, in this order:
 1. Done: helpers for subagents.
 2. Done: thinking.
